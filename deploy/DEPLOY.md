@@ -28,6 +28,18 @@ certbot certonly --webroot \
 
 Обновление всех сертификатов (как обычно): `certbot renew` — тоже по отдельным именам; ничего не «склеивается», если не меняли конфиги вручную.
 
+## HAProxy на сервере (89.169.39.244)
+
+Внешний **443** обслуживает **HAProxy** по SNI; nginx принимает TLS на **127.0.0.1:9443**. Обязательно:
+
+1. В конец `/var/lib/haproxy/sni-web.map` добавить строку (табуляция между полями):
+
+   `rinulik.neeklo.ru	bk_nginx`
+
+2. `systemctl reload haproxy`
+
+3. В nginx использовать **`deploy/nginx-rinulik.ssl.conf`** (слушает `:9443` + публичный `:80` для ACME и редиректа), а не `listen 443` на nginx.
+
 ## Установка на сервере (пример)
 
 ```bash
@@ -47,7 +59,7 @@ rsync -a --delete dist/ /var/www/rinulik.neeklo.ru/
 # или: cp -a dist/. /var/www/rinulik.neeklo.ru/
 ```
 
-Nginx:
+Nginx + certbot (сначала только HTTP, см. `deploy/nginx-rinulik.neeklo.ru.conf`):
 
 ```bash
 cp deploy/nginx-rinulik.neeklo.ru.conf /etc/nginx/sites-available/rinulik.neeklo.ru
@@ -55,12 +67,12 @@ ln -sf /etc/nginx/sites-available/rinulik.neeklo.ru /etc/nginx/sites-enabled/rin
 nginx -t && systemctl reload nginx
 ```
 
-Затем выполните certbot (команда выше). После появления `/etc/letsencrypt/live/rinulik.neeklo.ru/`:
+Затем certbot (команда с `--cert-name rinulik.neeklo.ru` выше). После появления `/etc/letsencrypt/live/rinulik.neeklo.ru/`:
 
-- Объедините конфиг: возьмите `deploy/nginx-rinulik.ssl.conf` (HTTPS + редирект HTTP→HTTPS, ACME на :80 сохраняется) как основу **или** допишите `server { listen 443 ... }` вручную, **указав только** пути `live/rinulik.neeklo.ru/`.
+- Установить `deploy/nginx-rinulik.ssl.conf` (9443 + :80), добавить домен в `sni-web.map`, `reload haproxy`.
 - `nginx -t && systemctl reload nginx`
 
-Не используйте `certbot --nginx` без проверки diff, если на сервере кастомные правки: безопаснее оставаться на `certonly --webroot`.
+Не используйте `certbot --nginx` без проверки diff на этом хосте: безопаснее `certonly --webroot`.
 
 ## Обновление фронта
 
