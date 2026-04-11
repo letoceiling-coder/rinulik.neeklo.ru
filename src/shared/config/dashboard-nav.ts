@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard,
   Users,
+  UserCog,
   Video,
   Layers,
   CreditCard,
@@ -28,7 +29,8 @@ export const DASHBOARD_NAV: DashboardNavItem[] = [
   { to: ROUTES.dashboard.advantages, label: 'Преимущества', icon: Sparkles },
   { to: ROUTES.dashboard.banner, label: 'Баннер', icon: ImageIcon },
   { to: ROUTES.dashboard.products, label: 'Продукты', icon: Package },
-  { to: ROUTES.dashboard.chatDemo, label: 'Чат (демо)', icon: MessageSquare },
+  { to: ROUTES.dashboard.chatDemo, label: 'Чат: подсказки', icon: MessageSquare },
   { to: ROUTES.dashboard.leads, label: 'Заявки', icon: Users },
+  { to: ROUTES.dashboard.users, label: 'Пользователи', icon: UserCog },
   { to: ROUTES.dashboard.settings, label: 'Профиль', icon: Settings },
 ]

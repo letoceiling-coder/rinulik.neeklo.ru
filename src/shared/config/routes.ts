@@ -12,6 +12,7 @@ export const ROUTES = {
     products: '/dashboard/products',
     chatDemo: '/dashboard/chat-demo',
     leads: '/dashboard/leads',
+    users: '/dashboard/users',
     settings: '/dashboard/settings',
   },
 } as const

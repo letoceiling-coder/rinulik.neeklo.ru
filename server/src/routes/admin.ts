@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import { Router } from 'express'
 import multer from 'multer'
-import { Prisma, VideoCategory, LeadStatus, ChatSide } from '@prisma/client'
+import bcrypt from 'bcryptjs'
+import { Prisma, VideoCategory, LeadStatus, ChatSide, Role } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { requireAdmin, type AuthedRequest } from '../middleware/requireAdmin.js'
 
@@ -23,6 +24,7 @@ const storage = multer.diskStorage({
     else if (file.fieldname === 'video') cb(null, path.join(uploadRoot, 'videos'))
     else if (file.fieldname === 'image') cb(null, path.join(uploadRoot, 'products'))
     else if (file.fieldname === 'previewImage') cb(null, path.join(uploadRoot, 'banner'))
+    else if (file.fieldname === 'heroVideo') cb(null, path.join(uploadRoot, 'banner'))
     else cb(null, uploadRoot)
   },
   filename: (_req, file, cb) => {
@@ -299,9 +301,14 @@ adminRouter.get('/banner', async (_req, res) => {
 
 adminRouter.patch(
   '/banner',
-  upload.single('previewImage'),
+  upload.fields([
+    { name: 'previewImage', maxCount: 1 },
+    { name: 'heroVideo', maxCount: 1 },
+  ]),
   async (req: AuthedRequest, res) => {
-    const file = req.file
+    const files = req.files as Record<string, Express.Multer.File[]> | undefined
+    const preview = files?.previewImage?.[0]
+    const heroVid = files?.heroVideo?.[0]
     const {
       headline,
       subheadline,
@@ -311,6 +318,8 @@ adminRouter.patch(
       ctaSecondaryHref,
       ctaBoxTitle,
       ctaBoxSubtitle,
+      heroVideoUrl: heroVideoUrlBody,
+      clearHeroVideo,
     } = req.body as Record<string, string | undefined>
     const data: Record<string, unknown> = {}
     if (headline !== undefined) data.headline = headline
@@ -321,8 +330,16 @@ adminRouter.patch(
     if (ctaSecondaryHref !== undefined) data.ctaSecondaryHref = ctaSecondaryHref
     if (ctaBoxTitle !== undefined) data.ctaBoxTitle = ctaBoxTitle
     if (ctaBoxSubtitle !== undefined) data.ctaBoxSubtitle = ctaBoxSubtitle
-    if (file) {
-      data.previewImageUrl = publicFileUrl(path.relative(uploadRoot, file.path))
+    if (preview) {
+      data.previewImageUrl = publicFileUrl(path.relative(uploadRoot, preview.path))
+    }
+    if (heroVid) {
+      data.heroVideoUrl = publicFileUrl(path.relative(uploadRoot, heroVid.path))
+    } else if (heroVideoUrlBody !== undefined && heroVideoUrlBody.trim() !== '') {
+      data.heroVideoUrl = heroVideoUrlBody.trim()
+    }
+    if (clearHeroVideo === '1' || clearHeroVideo === 'true') {
+      data.heroVideoUrl = null
     }
     const b = await prisma.heroBanner.update({ where: { id: 1 }, data })
     res.json(b)
@@ -446,5 +463,74 @@ adminRouter.patch('/chat-demo/:id', async (req, res) => {
 
 adminRouter.delete('/chat-demo/:id', async (req, res) => {
   await prisma.chatDemoLine.delete({ where: { id: req.params.id } })
+  res.status(204).end()
+})
+
+adminRouter.get('/users', async (_req, res) => {
+  const users = await prisma.user.findMany({
+    select: { id: true, email: true, role: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  })
+  res.json({ users })
+})
+
+adminRouter.post('/users', async (req, res) => {
+  const { email, password, role } = req.body as { email?: string; password?: string; role?: string }
+  if (!email?.trim() || !password || password.length < 6) {
+    return res.status(400).json({ error: 'email and password (min 6 chars) required' })
+  }
+  const r = role === 'ADMIN' ? Role.ADMIN : Role.USER
+  try {
+    const passwordHash = await bcrypt.hash(password, 10)
+    const u = await prisma.user.create({
+      data: { email: email.trim().toLowerCase(), passwordHash, role: r },
+      select: { id: true, email: true, role: true, createdAt: true },
+    })
+    res.status(201).json(u)
+  } catch {
+    res.status(400).json({ error: 'email already exists' })
+  }
+})
+
+adminRouter.patch('/users/:id', async (req: AuthedRequest, res) => {
+  const id = typeof req.params.id === 'string' ? req.params.id : req.params.id?.[0]
+  if (!id) return res.status(400).json({ error: 'invalid id' })
+  const { role, password } = req.body as { role?: string; password?: string }
+  const data: { role?: Role; passwordHash?: string } = {}
+  if (role !== undefined) {
+    const rk = role.toUpperCase() as keyof typeof Role
+    if (!Role[rk]) return res.status(400).json({ error: 'invalid role' })
+    data.role = Role[rk]
+  }
+  if (password != null && password !== '') {
+    if (password.length < 6) return res.status(400).json({ error: 'password min 6 chars' })
+    data.passwordHash = await bcrypt.hash(password, 10)
+  }
+  if (Object.keys(data).length === 0) return res.status(400).json({ error: 'nothing to update' })
+  const target = await prisma.user.findUnique({ where: { id } })
+  if (!target) return res.status(404).json({ error: 'not found' })
+  if (target.role === Role.ADMIN && data.role === Role.USER) {
+    const admins = await prisma.user.count({ where: { role: Role.ADMIN } })
+    if (admins <= 1) return res.status(400).json({ error: 'last admin cannot be demoted' })
+  }
+  const u = await prisma.user.update({
+    where: { id },
+    data,
+    select: { id: true, email: true, role: true, createdAt: true },
+  })
+  res.json(u)
+})
+
+adminRouter.delete('/users/:id', async (req: AuthedRequest, res) => {
+  const id = typeof req.params.id === 'string' ? req.params.id : req.params.id?.[0]
+  if (!id) return res.status(400).json({ error: 'invalid id' })
+  if (id === req.userId) return res.status(400).json({ error: 'cannot delete yourself' })
+  const target = await prisma.user.findUnique({ where: { id } })
+  if (!target) return res.status(404).json({ error: 'not found' })
+  if (target.role === Role.ADMIN) {
+    const admins = await prisma.user.count({ where: { role: Role.ADMIN } })
+    if (admins <= 1) return res.status(400).json({ error: 'cannot delete last admin' })
+  }
+  await prisma.user.delete({ where: { id } })
   res.status(204).end()
 })

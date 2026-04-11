@@ -12,6 +12,7 @@ import { DashboardProductsPage } from '@/pages/dashboard/DashboardProductsPage'
 import { DashboardServicesPage } from '@/pages/dashboard/DashboardServicesPage'
 import { DashboardSettingsPage } from '@/pages/dashboard/DashboardSettingsPage'
 import { DashboardTariffsPage } from '@/pages/dashboard/DashboardTariffsPage'
+import { DashboardUsersPage } from '@/pages/dashboard/DashboardUsersPage'
 import { DashboardVideosPage } from '@/pages/dashboard/DashboardVideosPage'
 import { LandingPage } from '@/pages/landing/LandingPage'
 import { VideosPage } from '@/pages/videos/VideosPage'
@@ -35,6 +36,7 @@ export function AppRouter() {
           <Route path="products" element={<DashboardProductsPage />} />
           <Route path="chat-demo" element={<DashboardChatDemoPage />} />
           <Route path="leads" element={<DashboardLeadsPage />} />
+          <Route path="users" element={<DashboardUsersPage />} />
           <Route path="settings" element={<DashboardSettingsPage />} />
         </Route>
       </Route>

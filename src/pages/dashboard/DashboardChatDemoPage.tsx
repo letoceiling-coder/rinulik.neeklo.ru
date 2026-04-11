@@ -67,8 +67,11 @@ export function DashboardChatDemoPage() {
 
   return (
     <div className="p-6 lg:p-8">
-      <h1 className="text-2xl font-semibold text-white">Демо-чат</h1>
-      <p className="mt-1 text-sm text-zinc-500">Реплики для блока на главной (сторона user / bot)</p>
+      <h1 className="text-2xl font-semibold text-white">Чат: подсказки</h1>
+      <p className="mt-1 text-sm text-zinc-500">
+        Короткие фразы с ролью bot показываются кнопками под виджетом; сам ответ идёт через Ollama (
+        <code className="text-zinc-400">OLLAMA_URL</code> на сервере).
+      </p>
       <form onSubmit={add} className="mt-6 flex max-w-3xl flex-wrap items-end gap-2 rounded-xl border border-white/10 bg-zinc-900/40 p-4">
         <Input
           value={text}

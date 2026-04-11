@@ -26,7 +26,7 @@ export function CtaSection({ banner }: CtaSectionProps) {
         json: { name, phone, source: 'landing' },
       })
       setSent(true)
-      e.currentTarget.reset()
+      // Не вызывать reset() после setSent: форма размонтируется и currentTarget может быть недоступен (React 19).
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка отправки')
     } finally {

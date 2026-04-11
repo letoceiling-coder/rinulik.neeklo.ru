@@ -6,6 +6,8 @@ export interface PublicBanner {
   ctaSecondaryLabel: string
   ctaSecondaryHref: string
   previewImageUrl: string | null
+  /** Фоновое видео в блоке превью героя (файл или внешний URL) */
+  heroVideoUrl?: string | null
   ctaBoxTitle: string
   ctaBoxSubtitle: string
 }

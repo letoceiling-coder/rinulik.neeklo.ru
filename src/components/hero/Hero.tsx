@@ -74,7 +74,17 @@ export function Hero({ banner }: HeroProps) {
             transition={{ type: 'spring', stiffness: 400, damping: 25 }}
             className="group relative aspect-video overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-violet-950/80 via-zinc-900 to-indigo-950/90 shadow-2xl shadow-violet-950/40 ring-1 ring-white/5"
           >
-            {banner.previewImageUrl ? (
+            {banner.heroVideoUrl ? (
+              <video
+                src={assetUrl(banner.heroVideoUrl)}
+                poster={banner.previewImageUrl ? assetUrl(banner.previewImageUrl) : undefined}
+                className="absolute inset-0 size-full object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
+              />
+            ) : banner.previewImageUrl ? (
               <img
                 src={assetUrl(banner.previewImageUrl)}
                 alt=""
@@ -83,13 +93,16 @@ export function Hero({ banner }: HeroProps) {
             ) : (
               <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cdefs%3E%3Cpattern%20id%3D%22g%22%20width%3D%2260%22%20height%3D%2260%22%20patternUnits%3D%22userSpaceOnUse%22%3E%3Cpath%20d%3D%22M60%200H0v60%22%20fill%3D%22none%22%20stroke%3D%22rgba(255%2C255%2C255%2C0.04)%22%2F%3E%3C%2Fpattern%3E%3C%2Fdefs%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22url(%23g)%22%2F%3E%3C%2Fsvg%3E')] opacity-60" />
             )}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="flex size-16 items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-sm transition-all group-hover:bg-violet-500/30 group-hover:shadow-violet-500/40">
-                <span className="ml-1 text-2xl">▶</span>
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20" />
+            {!banner.heroVideoUrl ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex size-16 items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-sm transition-all group-hover:bg-violet-500/30 group-hover:shadow-violet-500/40">
+                  <span className="ml-1 text-2xl">▶</span>
+                </div>
               </div>
-            </div>
+            ) : null}
             <p className="absolute bottom-4 left-4 right-4 text-center text-xs text-zinc-500">
-              Превью баннера · настройка в админ-панели
+              Превью баннера · изображение и видео в разделе «Баннер»
             </p>
           </motion.div>
         </motion.div>

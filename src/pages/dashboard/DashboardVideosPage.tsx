@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch, apiUploadForm } from '@/shared/api/client'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -20,6 +20,8 @@ export function DashboardVideosPage() {
   const [title, setTitle] = useState('')
   const [category, setCategory] = useState<string>('ad')
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
 
   const load = useCallback(async () => {
     const r = await apiFetch<{ videos: AdminVideo[] }>('/api/admin/videos')
@@ -32,17 +34,21 @@ export function DashboardVideosPage() {
 
   async function onUpload(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const form = e.currentTarget
+    setError(null)
+    const form = formRef.current
+    if (!form) return
     const fd = new FormData(form)
     fd.set('title', title.trim())
     fd.set('category', category)
     setBusy(true)
     try {
       await apiUploadForm('/api/admin/videos', fd, 'POST')
-      e.currentTarget.reset()
+      form.reset()
       setTitle('')
       setCategory('ad')
       await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка загрузки')
     } finally {
       setBusy(false)
     }
@@ -57,8 +63,12 @@ export function DashboardVideosPage() {
   return (
     <div className="p-6 lg:p-8">
       <h1 className="text-2xl font-semibold text-white">Видео</h1>
-      <p className="mt-1 text-sm text-zinc-500">Загрузка постера и ролика (multipart)</p>
+      <p className="mt-1 text-sm text-zinc-500">
+        Укажите название, выберите постер (картинку) и файл видео — оба обязательны для новой записи.
+      </p>
+      {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
       <form
+        ref={formRef}
         className="mt-6 max-w-xl space-y-3 rounded-xl border border-white/10 bg-zinc-900/40 p-4"
         onSubmit={onUpload}
       >

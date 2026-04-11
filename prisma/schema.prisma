@@ -90,6 +90,8 @@ model HeroBanner {
   ctaSecondaryLabel  String
   ctaSecondaryHref   String
   previewImageUrl    String?
+  /** Фоновое видео баннера (URL после загрузки в /uploads/banner или внешняя ссылка) */
+  heroVideoUrl       String?
   ctaBoxTitle        String  @default("Начать бесплатно")
   ctaBoxSubtitle     String  @default("Оставьте контакт — пришлём доступ в песочницу")
   updatedAt          DateTime @updatedAt
