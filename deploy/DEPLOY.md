@@ -117,6 +117,12 @@ certbot certonly --webroot \
 
 Логи: `pm2 logs generate-ai-video`
 
+### Превью в админке 404, а файлы в `uploads/` есть
+
+Проверьте, откуда запущен процесс: `pm2 describe generate-ai-video` — поля **script path** и **exec cwd** должны быть внутри **`/var/www/rinulik-build`**, а не старого каталога вроде `/var/www/generate-al-video`. Иначе Node ищет `uploads/` не там и/или крутится старая сборка без нужных API.
+
+Исправление: `pm2 delete generate-ai-video`, затем `cd /var/www/rinulik-build && pm2 start deploy/ecosystem.config.cjs && pm2 save`.
+
 ## Прочее
 
 - Однократная подготовка ОС (Node 22, PM2): `sudo bash deploy/bootstrap-server.sh`
