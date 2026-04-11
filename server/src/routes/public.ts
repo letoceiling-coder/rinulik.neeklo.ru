@@ -166,8 +166,18 @@ publicRouter.post('/chat', async (req, res) => {
         'Ассистент временно недоступен. На сервере задайте OLLAMA_URL (например http://188.124.55.89:11434).',
     })
   }
-  const { messages } = req.body as { messages?: Array<{ role: string; content: string }> }
-  if (!Array.isArray(messages) || messages.length === 0 || messages.length > 40) {
+  const raw = req.body as { messages?: unknown }
+  const rawList = Array.isArray(raw.messages) ? raw.messages : []
+  const normalized = rawList
+    .map((m) => {
+      const o = m as { role?: string; content?: unknown }
+      return {
+        role: o.role === 'user' ? 'user' : 'assistant',
+        content: String(o.content ?? '').trim().slice(0, 8000),
+      }
+    })
+    .filter((m) => m.content.length > 0)
+  if (normalized.length === 0 || normalized.length > 40) {
     return res.status(400).json({ error: 'invalid messages' })
   }
   const model = process.env.OLLAMA_MODEL || 'llama3:8b'
@@ -177,10 +187,7 @@ publicRouter.post('/chat', async (req, res) => {
 
   const ollamaMessages: { role: string; content: string }[] = [
     { role: 'system', content: system },
-    ...messages.map((m) => {
-      const role = m.role === 'user' ? 'user' : 'assistant'
-      return { role, content: String(m.content ?? '').slice(0, 8000) }
-    }),
+    ...normalized,
   ]
 
   try {

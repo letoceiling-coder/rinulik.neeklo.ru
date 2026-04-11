@@ -35,14 +35,17 @@ async function postChat(messages: Msg[]): Promise<string> {
   return data.reply
 }
 
+const INITIAL_MESSAGES: Msg[] = [
+  {
+    role: 'assistant',
+    content:
+      'Здравствуйте! Я онлайн-ассистент GenerateAI. Спросите про видео, тарифы или оставьте контакт в форме ниже.',
+  },
+]
+
 export function ChatWidget({ starterHints = [] }: ChatWidgetProps) {
-  const [messages, setMessages] = useState<Msg[]>([
-    {
-      role: 'assistant',
-      content:
-        'Здравствуйте! Я онлайн-ассистент GenerateAI. Спросите про видео, тарифы или оставьте контакт в форме ниже.',
-    },
-  ])
+  const messagesRef = useRef<Msg[]>(INITIAL_MESSAGES)
+  const [messages, setMessages] = useState<Msg[]>(INITIAL_MESSAGES)
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -61,18 +64,20 @@ export function ChatWidget({ starterHints = [] }: ChatWidgetProps) {
     setError(null)
     setDraft('')
     const userMsg: Msg = { role: 'user', content: trimmed }
-    let forApi: Msg[] = []
-    setMessages((prev) => {
-      forApi = [...prev, userMsg]
-      return forApi
-    })
+    const withUser = [...messagesRef.current, userMsg]
+    messagesRef.current = withUser
+    setMessages(withUser)
     setLoading(true)
     try {
-      const reply = await postChat(forApi)
-      setMessages((prev) => [...prev, { role: 'assistant', content: reply }])
+      const reply = await postChat(withUser)
+      const withAssistant: Msg[] = [...withUser, { role: 'assistant', content: reply }]
+      messagesRef.current = withAssistant
+      setMessages(withAssistant)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка')
-      setMessages((prev) => prev.slice(0, -1))
+      const rolled = messagesRef.current.slice(0, -1)
+      messagesRef.current = rolled
+      setMessages(rolled)
     } finally {
       busyRef.current = false
       setLoading(false)

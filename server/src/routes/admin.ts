@@ -46,12 +46,51 @@ function publicFileUrl(relFromUploadRoot: string): string {
   return `/uploads/${n}`
 }
 
+/** Разрешить подставить уже загруженный файл (из медиатеки), не произвольный URL */
+function safeExistingUploadUrl(raw: string | undefined): string | null {
+  if (raw === undefined) return null
+  const t = raw.trim()
+  if (!t.startsWith('/uploads/')) return null
+  if (t.includes('..') || t.includes('\\')) return null
+  return t
+}
+
 function coerceBool(v: unknown, defaultValue: boolean): boolean {
   if (typeof v === 'boolean') return v
   if (v === 'true') return true
   if (v === 'false') return false
   return defaultValue
 }
+
+const MEDIA_IMAGE = /\.(jpe?g|png|gif|webp|svg)$/i
+const MEDIA_VIDEO = /\.(mp4|webm|mov|mkv)$/i
+
+adminRouter.get('/media/library', async (_req, res) => {
+  ensureUploadDirs()
+  type LibFile = { url: string; kind: 'image' | 'video'; folder: string }
+  const files: LibFile[] = []
+  for (const folder of ['banner', 'posters', 'videos', 'products'] as const) {
+    const dir = path.join(uploadRoot, folder)
+    if (!fs.existsSync(dir)) continue
+    for (const name of fs.readdirSync(dir)) {
+      const fp = path.join(dir, name)
+      if (!fs.statSync(fp).isFile()) continue
+      const kind = MEDIA_VIDEO.test(name) ? 'video' : MEDIA_IMAGE.test(name) ? 'image' : null
+      if (!kind) continue
+      files.push({
+        url: publicFileUrl(path.posix.join(folder, name)),
+        kind,
+        folder,
+      })
+    }
+  }
+  files.sort((a, b) => b.url.localeCompare(a.url))
+  const catalog = await prisma.video.findMany({
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+    select: { id: true, title: true, posterUrl: true, videoUrl: true },
+  })
+  res.json({ files, catalog })
+})
 
 adminRouter.get('/stats', async (_req, res) => {
   const [videos, leads, services, tariffs, products] = await Promise.all([
@@ -318,6 +357,7 @@ adminRouter.patch(
       ctaSecondaryHref,
       ctaBoxTitle,
       ctaBoxSubtitle,
+      previewImageUrl: previewImageUrlBody,
       heroVideoUrl: heroVideoUrlBody,
       clearHeroVideo,
     } = req.body as Record<string, string | undefined>
@@ -332,6 +372,9 @@ adminRouter.patch(
     if (ctaBoxSubtitle !== undefined) data.ctaBoxSubtitle = ctaBoxSubtitle
     if (preview) {
       data.previewImageUrl = publicFileUrl(path.relative(uploadRoot, preview.path))
+    } else {
+      const pick = safeExistingUploadUrl(previewImageUrlBody)
+      if (pick) data.previewImageUrl = pick
     }
     if (heroVid) {
       data.heroVideoUrl = publicFileUrl(path.relative(uploadRoot, heroVid.path))
