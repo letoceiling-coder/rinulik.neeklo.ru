@@ -1,5 +1,8 @@
-# Скопируйте в /etc/nginx/sites-available/ и подставьте server_name + ssl пути.
-# Прокси на тот же порт, что в ecosystem.config.cjs (по умолчанию 4010).
+# Не используется для rinulik.neeklo.ru.
+# Для https://rinulik.neeklo.ru/ см. deploy/DEPLOY.md и файлы deploy/nginx-rinulik*.conf
+#
+# Это шаблон «весь трафик через Node»: скопируйте в /etc/nginx/sites-available/,
+# подставьте server_name и пути к сертификатам. Порт бэкенда — как в ecosystem.config.cjs (4010).
 
 upstream generate_ai_video_backend {
     server 127.0.0.1:4010;

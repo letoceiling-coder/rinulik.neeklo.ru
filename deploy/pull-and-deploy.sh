@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# На сервере: обновить код из Git и пересобрать.
-# Использование: cd /var/www/generate-al-video && bash deploy/pull-and-deploy.sh
+# На сервере: git pull и полная пересборка (см. deploy/DEPLOY.md).
+# Использование: cd /var/www/rinulik-build && bash deploy/pull-and-deploy.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 BRANCH="${DEPLOY_BRANCH:-main}"

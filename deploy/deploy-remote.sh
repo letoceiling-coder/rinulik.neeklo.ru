@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Запускать НА СЕРВЕРЕ из корня проекта: bash deploy/deploy-remote.sh
+# НА СЕРВЕРЕ из корня клона: cd /var/www/rinulik-build && bash deploy/deploy-remote.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
@@ -15,6 +15,11 @@ npx prisma generate
 npx prisma db push
 npm run db:seed || true
 NODE_ENV=production npm run build
+
+# Статика для nginx (rinulik.neeklo.ru); см. deploy/DEPLOY.md
+if [[ -d /var/www/rinulik.neeklo.ru ]]; then
+  rsync -a --delete dist/ /var/www/rinulik.neeklo.ru/
+fi
 
 pm2 restart generate-ai-video 2>/dev/null || pm2 start deploy/ecosystem.config.cjs
 pm2 save

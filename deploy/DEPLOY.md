@@ -1,15 +1,89 @@
-# Деплой rinulik.neeklo.ru
+# Деплой https://rinulik.neeklo.ru/
 
-Репозиторий: [github.com/letoceiling-coder/rinulik.neeklo.ru](https://github.com/letoceiling-coder/rinulik.neeklo.ru)
+Официальная инструкция для продакшена. Другие пути в репозитории не используются.
 
-## Перед началом
+**Сервер:** `root@89.169.39.244`  
+**Репозиторий:** [github.com/letoceiling-coder/rinulik.neeklo.ru](https://github.com/letoceiling-coder/rinulik.neeklo.ru)
 
-1. DNS: запись **A** для `rinulik.neeklo.ru` → `89.169.39.244` (и при необходимости **AAAA** для IPv6).
-2. На сервере уже есть другие сайты — **не редактируйте чужие** файлы в `sites-enabled`, только добавьте новый.
+## Где что лежит
 
-## Безопасный выпуск сертификата (не трогает другие домены)
+| Назначение | Путь на сервере |
+|------------|-----------------|
+| Клон Git, **PM2 cwd**, SQLite (`prisma/prod.db`), каталог **`uploads/`**, артефакты **`dist/`** и **`dist-server/`** | **`/var/www/rinulik-build`** |
+| Корень nginx для **SPA** (синхронизация из `dist/`) | **`/var/www/rinulik.neeklo.ru`** |
 
-Используйте **отдельное имя линии сертификата** и **webroot только для этого сайта**:
+**Порт API:** `4010` (тот же процесс отдаёт `/api`, `/uploads` и при необходимости SPA с диска; с nginx статика читается из `WEB_ROOT`, а запросы к `/api` и `/uploads` проксируются в Node — см. `deploy/nginx-rinulik.ssl.conf`).
+
+## DNS
+
+Запись **A** для `rinulik.neeklo.ru` → `89.169.39.244` (при необходимости **AAAA**).
+
+## Первый запуск (с нуля)
+
+```bash
+ssh root@89.169.39.244
+
+mkdir -p /var/www/rinulik.neeklo.ru
+cd /var/www
+git clone https://github.com/letoceiling-coder/rinulik.neeklo.ru.git rinulik-build
+cd rinulik-build
+
+cp deploy/env.production.example .env
+nano .env   # DATABASE_URL, JWT_SECRET, FRONTEND_ORIGIN=https://rinulik.neeklo.ru, PORT=4010
+
+bash deploy/deploy-remote.sh
+```
+
+Скрипт `deploy-remote.sh` ставит зависимости, собирает клиент и сервер, выполняет `prisma db push`, перезапускает PM2 и **копирует `dist/` в `/var/www/rinulik.neeklo.ru/`**, если этот каталог существует.
+
+Дальше — nginx и TLS (ниже).
+
+## Обновление после `git push` (основной цикл)
+
+На сервере:
+
+```bash
+ssh root@89.169.39.244
+cd /var/www/rinulik-build
+bash deploy/pull-and-deploy.sh
+```
+
+Ветка по умолчанию: `main`. Другая ветка: `DEPLOY_BRANCH=develop bash deploy/pull-and-deploy.sh`.
+
+Локально перед этим: `git push origin main`.
+
+Проверка API: `curl -sS http://127.0.0.1:4010/api/health`
+
+## Переменные окружения
+
+Файл **`.env`** только в **`/var/www/rinulik-build/.env`** (в Git не коммитится).
+
+Скопируйте из `deploy/env.production.example` и задайте минимум:
+
+- `DATABASE_URL` — путь к SQLite (в примере под `/var/www/rinulik-build/`)
+- `JWT_SECRET` — длинная случайная строка
+- `FRONTEND_ORIGIN=https://rinulik.neeklo.ru`
+- `PORT=4010`
+
+Для SPA с тем же доменом **`VITE_API_URL` оставьте пустым** (запросы на `/api` с того же origin).
+
+## Nginx и TLS для этого домена
+
+На сервере могут быть **другие сайты** — не правьте чужие `server {}`, только добавьте конфиг для `rinulik.neeklo.ru`.
+
+### 1. HTTP (webroot для ACME + статика)
+
+Шаблон: `deploy/nginx-rinulik.neeklo.ru.conf` — в нём уже есть `location ^~ /.well-known/acme-challenge/` с `root /var/www/rinulik.neeklo.ru`, прокси `/api/` и `/uploads/` на Node.
+
+```bash
+cp deploy/nginx-rinulik.neeklo.ru.conf /etc/nginx/sites-available/rinulik.neeklo.ru
+ln -sf /etc/nginx/sites-available/rinulik.neeklo.ru /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
+```
+
+### 2. Certbot (отдельное имя линии сертификата)
+
+Так выпускается только сертификат для этого домена, без затрагивания чужих:
 
 ```bash
 certbot certonly --webroot \
@@ -19,74 +93,31 @@ certbot certonly --webroot \
   --non-interactive --agree-tos -m YOUR_EMAIL@example.com
 ```
 
-Условия:
+Условие: для `rinulik.neeklo.ru` на **:80** уже отдаётся nginx с webroot, как в шаге 1. Не используйте `certbot --nginx` на общем хосте без проверки diff — безопаснее `certonly --webroot`.
 
-- В nginx для `rinulik.neeklo.ru` на порту 80 уже есть `location ^~ /.well-known/acme-challenge/` с `root /var/www/rinulik.neeklo.ru` (как в `nginx-rinulik.neeklo.ru.conf`).
-- Сначала включите **только HTTP**-блок, `nginx -t && systemctl reload nginx`, затем выполните certbot.
+Сертификаты появятся в `/etc/letsencrypt/live/rinulik.neeklo.ru/`. Обновление: `certbot renew`.
 
-Файлы сертификата появятся в `/etc/letsencrypt/live/rinulik.neeklo.ru/` — это **не перезаписывает** каталоги других сертификатов.
+### 3. HTTPS за HAProxy (89.169.39.244)
 
-Обновление всех сертификатов (как обычно): `certbot renew` — тоже по отдельным именам; ничего не «склеивается», если не меняли конфиги вручную.
+Внешний **:443** обслуживает **HAProxy** по SNI; nginx принимает TLS на **`127.0.0.1:9443`**.
 
-## HAProxy на сервере (89.169.39.244)
-
-Внешний **443** обслуживает **HAProxy** по SNI; nginx принимает TLS на **127.0.0.1:9443**. Обязательно:
-
-1. В конец `/var/lib/haproxy/sni-web.map` добавить строку (табуляция между полями):
-
+1. В конец `/var/lib/haproxy/sni-web.map` добавить строку (**табуляция** между полями):  
    `rinulik.neeklo.ru	bk_nginx`
-
 2. `systemctl reload haproxy`
+3. В nginx подключить **`deploy/nginx-rinulik.ssl.conf`** (слушает `:9443` и публичный `:80` для ACME и редиректа на HTTPS), скопировав в `sites-available` / `sites-enabled` по тому же принципу, что в шаге 1.
+4. `nginx -t && systemctl reload nginx`
 
-3. В nginx использовать **`deploy/nginx-rinulik.ssl.conf`** (слушает `:9443` + публичный `:80` для ACME и редиректа), а не `listen 443` на nginx.
+## PM2
 
-## Установка на сервере (пример)
+Имя процесса: **`generate-ai-video`**. Рабочий каталог в `deploy/ecosystem.config.cjs`: **`/var/www/rinulik-build`**.
 
-```bash
-ssh root@89.169.39.244
+Логи: `pm2 logs generate-ai-video`
 
-mkdir -p /var/www/rinulik.neeklo.ru
-cd /var/www
+## Прочее
 
-# Клонирование (или git pull при обновлении)
-git clone https://github.com/letoceiling-coder/rinulik.neeklo.ru.git rinulik-build
-cd rinulik-build
+- Однократная подготовка ОС (Node 22, PM2): `sudo bash deploy/bootstrap-server.sh`
+- Шаблон `deploy/nginx-site.conf.example` — **не** для rinulik; это вариант «весь трафик через Node». Для **rinulik.neeklo.ru** используйте только **`nginx-rinulik*.conf`** из этого каталога.
 
-npm ci
-npm run build
+## Админ после сида
 
-rsync -a --delete dist/ /var/www/rinulik.neeklo.ru/
-# или: cp -a dist/. /var/www/rinulik.neeklo.ru/
-```
-
-Nginx + certbot (сначала только HTTP, см. `deploy/nginx-rinulik.neeklo.ru.conf`):
-
-```bash
-cp deploy/nginx-rinulik.neeklo.ru.conf /etc/nginx/sites-available/rinulik.neeklo.ru
-ln -sf /etc/nginx/sites-available/rinulik.neeklo.ru /etc/nginx/sites-enabled/rinulik.neeklo.ru
-nginx -t && systemctl reload nginx
-```
-
-Затем certbot (команда с `--cert-name rinulik.neeklo.ru` выше). После появления `/etc/letsencrypt/live/rinulik.neeklo.ru/`:
-
-- Установить `deploy/nginx-rinulik.ssl.conf` (9443 + :80), добавить домен в `sni-web.map`, `reload haproxy`.
-- `nginx -t && systemctl reload nginx`
-
-Не используйте `certbot --nginx` без проверки diff на этом хосте: безопаснее `certonly --webroot`.
-
-## Обновление фронта
-
-```bash
-cd /var/www/rinulik-build && git pull && npm ci && npm run build
-rsync -a --delete dist/ /var/www/rinulik.neeklo.ru/
-```
-
-## Пуш с локальной машины (Windows)
-
-```powershell
-cd c:\OSPanel\domains\generate-al-video
-git remote add origin https://github.com/letoceiling-coder/rinulik.neeklo.ru.git
-git push -u origin main
-```
-
-При запросе пароля GitHub используйте **Personal Access Token** с правом `repo`.
+Email `admin@admin.local`, пароль из сида — смените в продакшене.
