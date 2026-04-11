@@ -11,4 +11,4 @@ npm run dev
 
 ## Деплой продакшена
 
-**[deploy/DEPLOY.md](deploy/DEPLOY.md)** — единственная актуальная инструкция (сервер `89.169.39.244`, каталоги `/var/www/rinulik-build` и `/var/www/rinulik.neeklo.ru`).
+**[deploy/DEPLOY.md](deploy/DEPLOY.md)** — единственная актуальная инструкция (сервер `89.169.39.244`, приложение в **`/var/www/generate-al-video`**, статика nginx для домена — **`/var/www/rinulik.neeklo.ru`**).

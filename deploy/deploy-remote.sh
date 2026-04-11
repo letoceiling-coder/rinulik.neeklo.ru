@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# НА СЕРВЕРЕ из корня клона: cd /var/www/rinulik-build && bash deploy/deploy-remote.sh
+# НА СЕРВЕРЕ из корня клона: cd /var/www/generate-al-video && bash deploy/deploy-remote.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"

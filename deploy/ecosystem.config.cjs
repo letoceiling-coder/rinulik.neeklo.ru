@@ -1,12 +1,12 @@
 /**
- * PM2: cd /var/www/rinulik-build && pm2 start deploy/ecosystem.config.cjs
+ * PM2: cd /var/www/generate-al-video && pm2 start deploy/ecosystem.config.cjs
  * Логи: pm2 logs generate-ai-video
  */
 module.exports = {
   apps: [
     {
       name: 'generate-ai-video',
-      cwd: '/var/www/rinulik-build',
+      cwd: '/var/www/generate-al-video',
       script: 'dist-server/index.js',
       instances: 1,
       exec_mode: 'fork',

@@ -7,14 +7,16 @@
 
 ## Где что лежит
 
+Домен **https://rinulik.neeklo.ru/** в браузере отдаёт **nginx**: HTML/CSS/JS из каталога ниже, запросы **`/api`** и **`/uploads`** проксируются на Node (**PM2**, порт `4010`) из **`/var/www/generate-al-video`** — там же лежат SQLite, `uploads/` и сборка `dist-server/`.
+
 | Назначение | Путь на сервере |
 |------------|-----------------|
-| Клон Git, **PM2 cwd**, SQLite (`prisma/prod.db`), каталог **`uploads/`**, артефакты **`dist/`** и **`dist-server/`** | **`/var/www/rinulik-build`** |
+| Клон Git, **PM2 cwd**, SQLite (`prisma/prod.db`), **`uploads/`**, **`dist/`**, **`dist-server/`** | **`/var/www/generate-al-video`** |
+| Корень nginx для **SPA** (копия `dist/` после `deploy-remote.sh`) | **`/var/www/rinulik.neeklo.ru`** |
 
 При переносе сервера копируйте вместе **`prisma/prod.db`** и каталог **`uploads/`**, иначе в БД останутся пути `/uploads/...` без файлов на диске (превью в админке не откроются).
-| Корень nginx для **SPA** (синхронизация из `dist/`) | **`/var/www/rinulik.neeklo.ru`** |
 
-**Порт API:** `4010` (тот же процесс отдаёт `/api`, `/uploads` и при необходимости SPA с диска; с nginx статика читается из `WEB_ROOT`, а запросы к `/api` и `/uploads` проксируются в Node — см. `deploy/nginx-rinulik.ssl.conf`).
+**Порт API:** `4010`. Схема nginx: `deploy/nginx-rinulik.ssl.conf`.
 
 ## DNS
 
@@ -27,8 +29,8 @@ ssh root@89.169.39.244
 
 mkdir -p /var/www/rinulik.neeklo.ru
 cd /var/www
-git clone https://github.com/letoceiling-coder/rinulik.neeklo.ru.git rinulik-build
-cd rinulik-build
+git clone https://github.com/letoceiling-coder/rinulik.neeklo.ru.git generate-al-video
+cd generate-al-video
 
 cp deploy/env.production.example .env
 nano .env   # DATABASE_URL, JWT_SECRET, FRONTEND_ORIGIN=https://rinulik.neeklo.ru, PORT=4010
@@ -46,7 +48,7 @@ bash deploy/deploy-remote.sh
 
 ```bash
 ssh root@89.169.39.244
-cd /var/www/rinulik-build
+cd /var/www/generate-al-video
 bash deploy/pull-and-deploy.sh
 ```
 
@@ -58,11 +60,11 @@ bash deploy/pull-and-deploy.sh
 
 ## Переменные окружения
 
-Файл **`.env`** только в **`/var/www/rinulik-build/.env`** (в Git не коммитится).
+Файл **`.env`** только в **`/var/www/generate-al-video/.env`** (в Git не коммитится).
 
 Скопируйте из `deploy/env.production.example` и задайте минимум:
 
-- `DATABASE_URL` — путь к SQLite (в примере под `/var/www/rinulik-build/`)
+- `DATABASE_URL` — путь к SQLite (в примере под `/var/www/generate-al-video/`)
 - `JWT_SECRET` — длинная случайная строка
 - `FRONTEND_ORIGIN=https://rinulik.neeklo.ru`
 - `PORT=4010`
@@ -113,15 +115,15 @@ certbot certonly --webroot \
 
 ## PM2
 
-Имя процесса: **`generate-ai-video`**. Рабочий каталог в `deploy/ecosystem.config.cjs`: **`/var/www/rinulik-build`**.
+Имя процесса: **`generate-ai-video`**. Рабочий каталог в `deploy/ecosystem.config.cjs`: **`/var/www/generate-al-video`**.
 
 Логи: `pm2 logs generate-ai-video`
 
 ### Превью в админке 404, а файлы в `uploads/` есть
 
-Проверьте, откуда запущен процесс: `pm2 describe generate-ai-video` — поля **script path** и **exec cwd** должны быть внутри **`/var/www/rinulik-build`**, а не старого каталога вроде `/var/www/generate-al-video`. Иначе Node ищет `uploads/` не там и/или крутится старая сборка без нужных API.
+Проверьте, откуда запущен процесс: `pm2 describe generate-ai-video` — поля **script path** и **exec cwd** должны быть внутри **`/var/www/generate-al-video`**. Если указан другой каталог (дубликат клона), Node читает не те `uploads/` и не ту сборку.
 
-Исправление: `pm2 delete generate-ai-video`, затем `cd /var/www/rinulik-build && pm2 start deploy/ecosystem.config.cjs && pm2 save`.
+Исправление: `pm2 delete generate-ai-video`, затем `cd /var/www/generate-al-video && pm2 start deploy/ecosystem.config.cjs && pm2 save`.
 
 ## Прочее
 
