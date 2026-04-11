@@ -15,24 +15,56 @@ function apiBase() {
   return import.meta.env.VITE_API_URL ?? ''
 }
 
-async function postChat(messages: Msg[]): Promise<string> {
-  const r = await fetch(`${apiBase()}/api/public/chat`, {
+async function streamPublicChat(
+  messages: Msg[],
+  signal: AbortSignal,
+  onDelta: (piece: string) => void,
+): Promise<void> {
+  const r = await fetch(`${apiBase()}/api/public/chat/stream`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
     body: JSON.stringify({
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
     }),
+    signal,
   })
-  const text = await r.text()
-  let data: { reply?: string; error?: string }
-  try {
-    data = JSON.parse(text) as { reply?: string; error?: string }
-  } catch {
-    throw new Error(text || 'Ошибка ответа сервера')
+  if (!r.ok) {
+    const t = await r.text()
+    let msg = t
+    try {
+      const j = JSON.parse(t) as { error?: string }
+      if (j.error) msg = j.error
+    } catch {
+      /* plain text */
+    }
+    throw new Error(msg || r.statusText)
   }
-  if (!r.ok) throw new Error(data.error || 'Ошибка чата')
-  if (!data.reply) throw new Error('Пустой ответ')
-  return data.reply
+  const reader = r.body?.getReader()
+  if (!reader) throw new Error('Нет тела ответа')
+  const dec = new TextDecoder()
+  let buf = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += dec.decode(value, { stream: true })
+    for (;;) {
+      const sep = buf.indexOf('\n\n')
+      if (sep === -1) break
+      const block = buf.slice(0, sep)
+      buf = buf.slice(sep + 2)
+      const dataLine = block.split('\n').find((l) => l.startsWith('data: '))
+      if (!dataLine) continue
+      let payload: { type: string; t?: string; error?: string }
+      try {
+        payload = JSON.parse(dataLine.slice(6)) as typeof payload
+      } catch {
+        continue
+      }
+      if (payload.type === 'error') throw new Error(payload.error || 'Ошибка')
+      if (payload.type === 'token' && payload.t) onDelta(payload.t)
+      if (payload.type === 'done') return
+    }
+  }
 }
 
 const INITIAL_MESSAGES: Msg[] = [
@@ -62,48 +94,33 @@ export function ChatWidget({ starterHints = [] }: ChatWidgetProps) {
   const [messages, setMessages] = useState<Msg[]>(INITIAL_MESSAGES)
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(false)
+  const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const busyRef = useRef(false)
-  /** Позиция «печати» для последнего ответа ассистента (null — показать целиком) */
-  const [reveal, setReveal] = useState<{ full: string; pos: number } | null>(null)
-  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const streamAbortRef = useRef<AbortController | null>(null)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
     const el = scrollRef.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [messages, loading, reveal])
+  }, [messages, loading])
 
   useEffect(() => {
-    if (!reveal) return
-    if (reveal.pos >= reveal.full.length) {
-      setReveal(null)
-      return
-    }
-    const len = reveal.full.length
-    const step = len > 900 ? 8 : len > 400 ? 5 : len > 150 ? 3 : 2
-    const delay = len > 600 ? 12 : 16
-    revealTimerRef.current = setTimeout(() => {
-      setReveal((r) => {
-        if (!r) return null
-        const next = Math.min(r.pos + step, r.full.length)
-        return next >= r.full.length ? null : { ...r, pos: next }
-      })
-    }, delay)
+    mountedRef.current = true
     return () => {
-      if (revealTimerRef.current) clearTimeout(revealTimerRef.current)
+      mountedRef.current = false
+      streamAbortRef.current?.abort()
     }
-  }, [reveal])
-
-  const flushReveal = useCallback(() => {
-    if (revealTimerRef.current) clearTimeout(revealTimerRef.current)
-    setReveal(null)
   }, [])
 
   const sendText = useCallback(async (text: string) => {
     const trimmed = text.trim()
     if (!trimmed || busyRef.current) return
-    flushReveal()
+    streamAbortRef.current?.abort()
+    streamAbortRef.current = new AbortController()
+    const signal = streamAbortRef.current.signal
+
     busyRef.current = true
     setError(null)
     setDraft('')
@@ -112,24 +129,44 @@ export function ChatWidget({ starterHints = [] }: ChatWidgetProps) {
     messagesRef.current = withUser
     setMessages(withUser)
     setLoading(true)
+    setPending(true)
     try {
-      const reply = await postChat(withUser)
-      const withAssistant: Msg[] = [...withUser, { role: 'assistant', content: reply }]
-      messagesRef.current = withAssistant
-      setMessages(withAssistant)
-      setReveal({ full: reply, pos: 0 })
+      await streamPublicChat(withUser, signal, (delta) => {
+        setLoading(false)
+        setMessages((prev) => {
+          const last = prev[prev.length - 1]
+          let next: Msg[]
+          if (last?.role === 'assistant') {
+            next = [...prev.slice(0, -1), { role: 'assistant', content: last.content + delta }]
+          } else {
+            next = [...prev, { role: 'assistant', content: delta }]
+          }
+          messagesRef.current = next
+          return next
+        })
+      })
     } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        if (!mountedRef.current) return
+        const rolled = messagesRef.current.slice(0, -1)
+        messagesRef.current = rolled
+        setMessages(rolled)
+        return
+      }
       setError(e instanceof Error ? e.message : 'Ошибка')
       const rolled = messagesRef.current.slice(0, -1)
       messagesRef.current = rolled
       setMessages(rolled)
     } finally {
       setLoading(false)
+      setPending(false)
       busyRef.current = false
     }
-  }, [flushReveal])
+  }, [])
 
   const lastIndex = messages.length - 1
+  const lastMsg = messages[lastIndex]
+  const showTypingRow = loading || (pending && lastMsg?.role === 'user')
 
   return (
     <Card className="mx-auto max-w-md overflow-hidden border-white/10">
@@ -140,41 +177,35 @@ export function ChatWidget({ starterHints = [] }: ChatWidgetProps) {
           </div>
           <div>
             <CardTitle className="text-base">GenerateAI Assistant</CardTitle>
-            <p className="text-xs text-zinc-500">онлайн · ответы на базе AI</p>
+            <p className="text-xs text-zinc-500">онлайн · потоковый ответ</p>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3 bg-[#0e1621] p-0">
         <div ref={scrollRef} className="flex max-h-[280px] flex-col gap-2 overflow-y-auto p-3">
-          {messages.map((m, i) => {
-            const isRevealingAssistant =
-              m.role === 'assistant' && reveal !== null && i === lastIndex && m.content === reveal.full
-            const visible = isRevealingAssistant ? m.content.slice(0, reveal.pos) : m.content
-            const showCaret = isRevealingAssistant && reveal.pos < m.content.length
-            return (
-              <motion.div
-                key={`${i}-${m.role}-${m.content.length}`}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.02 }}
-                className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          {messages.map((m, i) => (
+            <motion.div
+              key={`m-${i}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(i * 0.02, 0.2) }}
+              className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={
+                  m.role === 'user'
+                    ? 'max-w-[85%] rounded-2xl rounded-br-md bg-[#2b5278] px-3 py-2 text-sm text-white'
+                    : 'max-w-[85%] rounded-2xl rounded-bl-md bg-[#182533] px-3 py-2 text-sm text-zinc-100'
+                }
               >
-                <div
-                  className={
-                    m.role === 'user'
-                      ? 'max-w-[85%] rounded-2xl rounded-br-md bg-[#2b5278] px-3 py-2 text-sm text-white'
-                      : 'max-w-[85%] rounded-2xl rounded-bl-md bg-[#182533] px-3 py-2 text-sm text-zinc-100'
-                  }
-                >
-                  {visible}
-                  {showCaret ? (
-                    <span className="ml-0.5 inline-block w-0.5 animate-pulse bg-violet-400 align-text-bottom" style={{ height: '1em' }} />
-                  ) : null}
-                </div>
-              </motion.div>
-            )
-          })}
-          {loading ? (
+                {m.content}
+                {m.role === 'assistant' && i === lastIndex && pending && m.content.length > 0 ? (
+                  <span className="ml-0.5 inline-block w-0.5 animate-pulse bg-violet-400 align-text-bottom" style={{ height: '1em' }} />
+                ) : null}
+              </div>
+            </motion.div>
+          ))}
+          {showTypingRow ? (
             <motion.div
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
@@ -214,14 +245,14 @@ export function ChatWidget({ starterHints = [] }: ChatWidgetProps) {
             }}
             placeholder="Сообщение…"
             className="border-white/10 bg-[#182533]"
-            disabled={loading}
+            disabled={pending}
           />
           <Button
             type="button"
             size="icon"
             variant="secondary"
             className="shrink-0"
-            disabled={loading || !draft.trim()}
+            disabled={pending || !draft.trim()}
             onClick={() => void sendText(draft)}
           >
             ➤
