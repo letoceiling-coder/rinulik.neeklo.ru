@@ -97,6 +97,8 @@ certbot certonly --webroot \
 
 Сертификаты появятся в `/etc/letsencrypt/live/rinulik.neeklo.ru/`. Обновление: `certbot renew`.
 
+После появления сертификата в продакшене включайте в **`sites-enabled`** только файл **`rinulik.neeklo.ru.ssl`** (в нём уже есть `listen 80` для ACME и редиректа на HTTPS, и `listen 127.0.0.1:9443 ssl` для основного сайта). **Не включайте одновременно** отдельный сайт из `nginx-rinulik.neeklo.ru.conf` для того же `server_name` — nginx выдаст предупреждение о конфликте на порту 80, один из блоков будет проигнорирован.
+
 ### 3. HTTPS за HAProxy (89.169.39.244)
 
 Внешний **:443** обслуживает **HAProxy** по SNI; nginx принимает TLS на **`127.0.0.1:9443`**.
