@@ -9,12 +9,12 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-export NODE_ENV=production
+# Не ставить NODE_ENV=production до сборки — иначе npm ci пропустит devDependencies (vite, tsx, typescript).
 npm ci
 npx prisma generate
 npx prisma db push
 npm run db:seed || true
-npm run build
+NODE_ENV=production npm run build
 
 pm2 restart generate-ai-video 2>/dev/null || pm2 start deploy/ecosystem.config.cjs
 pm2 save
