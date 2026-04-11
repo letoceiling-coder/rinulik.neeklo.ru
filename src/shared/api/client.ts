@@ -35,10 +35,15 @@ export async function apiFetch<T>(
   return bodyText as T
 }
 
+/** URL для /uploads/... и других путей: при пустом VITE_API_URL — абсолютный origin (иначе nginx может не отдать файлы со SPA). */
 export function assetUrl(url: string): string {
   if (!url) return ''
   if (url.startsWith('http://') || url.startsWith('https://')) return url
-  return `${base()}${url}`
+  const b = base().replace(/\/$/, '')
+  const path = url.startsWith('/') ? url : `/${url}`
+  if (b) return `${b}${path}`
+  if (typeof window !== 'undefined') return `${window.location.origin}${path}`
+  return path
 }
 
 export async function apiUploadForm<T>(
