@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { apiFetch, apiUploadForm, assetUrl } from '@/shared/api/client'
+import { apiFetch, apiUploadForm } from '@/shared/api/client'
+import { AdminMediaImage } from '@/shared/ui/AdminMediaImage'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 
@@ -124,6 +125,7 @@ function ProductEditorRow({
   onRemove: (id: string) => Promise<void>
 }) {
   const [file, setFile] = useState<File | null>(null)
+  const [largeOpen, setLargeOpen] = useState(false)
   return (
     <li className="rounded-xl border border-white/10 bg-zinc-900/30 p-4 text-sm space-y-2">
       <div className="flex flex-wrap gap-2">
@@ -154,7 +156,43 @@ function ProductEditorRow({
         className="w-full rounded-lg border border-white/10 bg-zinc-950 px-3 py-2 text-zinc-100"
       />
       {row.imageUrl ? (
-        <img src={assetUrl(row.imageUrl)} alt="" className="max-h-32 rounded-lg border border-white/10" />
+        <div className="flex flex-wrap items-end gap-2">
+          <button
+            type="button"
+            className="rounded-lg border border-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+            onClick={() => setLargeOpen(true)}
+          >
+            <AdminMediaImage url={row.imageUrl} alt="" className="max-h-32 max-w-full rounded-lg object-cover" />
+          </button>
+          <Button type="button" variant="secondary" size="sm" onClick={() => setLargeOpen(true)}>
+            Крупное превью
+          </Button>
+        </div>
+      ) : null}
+      {largeOpen && row.imageUrl ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/75"
+            aria-label="Закрыть"
+            onClick={() => setLargeOpen(false)}
+          />
+          <div className="relative flex max-h-[min(92vh,900px)] w-full max-w-[min(1200px,96vw)] flex-col overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
+              <h2 className="text-sm font-semibold text-white">{row.title}</h2>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setLargeOpen(false)}>
+                Закрыть
+              </Button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <AdminMediaImage
+                url={row.imageUrl}
+                alt=""
+                className="max-h-[min(80vh,720px)] w-full rounded-lg border border-white/10 object-contain"
+              />
+            </div>
+          </div>
+        </div>
       ) : null}
       <label className="block text-xs text-zinc-500">
         Заменить картинку

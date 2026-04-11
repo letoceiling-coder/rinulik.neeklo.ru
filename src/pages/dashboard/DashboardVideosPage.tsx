@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch, apiUploadForm } from '@/shared/api/client'
+import { AdminMediaImage } from '@/shared/ui/AdminMediaImage'
+import { AdminMediaVideo } from '@/shared/ui/AdminMediaVideo'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 
@@ -31,6 +33,7 @@ export function DashboardVideosPage() {
   const [seekSec, setSeekSec] = useState(0)
   const [framePosterFile, setFramePosterFile] = useState<File | null>(null)
   const [frameThumbUrl, setFrameThumbUrl] = useState<string | null>(null)
+  const [preview, setPreview] = useState<AdminVideo | null>(null)
 
   const load = useCallback(async () => {
     const r = await apiFetch<{ videos: AdminVideo[] }>('/api/admin/videos')
@@ -160,8 +163,14 @@ export function DashboardVideosPage() {
 
   async function remove(id: string) {
     if (!window.confirm('Удалить видео и файлы с диска?')) return
-    await apiFetch(`/api/admin/videos/${id}`, { method: 'DELETE' })
-    await load()
+    setError(null)
+    try {
+      await apiFetch(`/api/admin/videos/${id}`, { method: 'DELETE' })
+      if (preview?.id === id) setPreview(null)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка удаления')
+    }
   }
 
   return (
@@ -261,17 +270,83 @@ export function DashboardVideosPage() {
           {busy ? 'Загрузка…' : 'Добавить'}
         </Button>
       </form>
-      <ul className="mt-8 divide-y divide-white/10 rounded-xl border border-white/10">
+      <h2 className="mt-10 text-lg font-medium text-zinc-200">Каталог</h2>
+      <p className="mt-1 text-xs text-zinc-500">Постеры через API (если nginx не отдаёт /uploads). «Просмотр» — крупное окно с видео.</p>
+      <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {videos.map((v) => (
-          <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
-            <span className="font-medium text-zinc-100">{v.title}</span>
-            <span className="text-zinc-500">{v.category}</span>
-            <Button type="button" variant="ghost" size="sm" onClick={() => void remove(v.id)}>
-              Удалить
-            </Button>
+          <li
+            key={v.id}
+            className="flex flex-col overflow-hidden rounded-xl border border-white/10 bg-zinc-900/40 text-sm"
+          >
+            <button
+              type="button"
+              className="group relative block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+              onClick={() => setPreview(v)}
+            >
+              <AdminMediaImage url={v.posterUrl} alt="" className="aspect-video w-full object-cover" />
+              <span className="sr-only">Открыть просмотр: {v.title}</span>
+            </button>
+            <div className="flex flex-1 flex-col gap-2 p-3">
+              <div>
+                <p className="font-medium text-zinc-100">{v.title}</p>
+                <p className="text-xs text-zinc-500">{v.category}</p>
+              </div>
+              <div className="mt-auto flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" size="sm" onClick={() => setPreview(v)}>
+                  Просмотр
+                </Button>
+                <Button type="button" variant="destructive" size="sm" onClick={() => void remove(v.id)}>
+                  Удалить
+                </Button>
+              </div>
+            </div>
           </li>
         ))}
       </ul>
+
+      {preview ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/75"
+            aria-label="Закрыть"
+            onClick={() => setPreview(null)}
+          />
+          <div className="relative flex max-h-[min(92vh,900px)] w-full max-w-[min(1400px,98vw)] flex-col overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
+              <h2 className="pr-4 text-sm font-semibold text-white">{preview.title}</h2>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setPreview(null)}>
+                Закрыть
+              </Button>
+            </div>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Постер</p>
+                <AdminMediaImage
+                  url={preview.posterUrl}
+                  alt=""
+                  className="max-h-[40vh] w-full rounded-lg border border-white/10 object-contain"
+                />
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Видео</p>
+                <AdminMediaVideo
+                  url={preview.videoUrl}
+                  className="max-h-[min(50vh,520px)] w-full rounded-lg border border-white/10 bg-black object-contain"
+                />
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2 border-t border-white/10 p-4">
+              <Button type="button" variant="destructive" onClick={() => void remove(preview.id)}>
+                Удалить с диска
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setPreview(null)}>
+                Закрыть
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

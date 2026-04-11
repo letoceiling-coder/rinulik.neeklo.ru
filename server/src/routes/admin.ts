@@ -55,6 +55,42 @@ function safeExistingUploadUrl(raw: string | undefined): string | null {
   return t
 }
 
+const MEDIA_CONTENT_TYPE: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
+  '.mkv': 'video/x-matroska',
+}
+
+function absUploadFromPublicUrl(publicUrl: string): string | null {
+  const t = publicUrl.trim()
+  if (!t.startsWith('/uploads/')) return null
+  const inner = t.slice('/uploads/'.length).replace(/^\/+/, '')
+  if (!inner || inner.includes('..')) return null
+  const abs = path.resolve(uploadRoot, inner)
+  const rel = path.relative(uploadRoot, abs)
+  if (rel.startsWith('..') || path.isAbsolute(rel)) return null
+  return abs
+}
+
+async function uploadFileInUse(publicUrl: string): Promise<string | null> {
+  const banner = await prisma.heroBanner.findUnique({ where: { id: 1 } })
+  if (banner?.previewImageUrl === publicUrl || banner?.heroVideoUrl === publicUrl) return 'баннер'
+  const vid = await prisma.video.findFirst({
+    where: { OR: [{ posterUrl: publicUrl }, { videoUrl: publicUrl }] },
+  })
+  if (vid) return `видео: ${vid.title}`
+  const pr = await prisma.product.findFirst({ where: { imageUrl: publicUrl } })
+  if (pr) return `продукт: ${pr.title}`
+  return null
+}
+
 function coerceBool(v: unknown, defaultValue: boolean): boolean {
   if (typeof v === 'boolean') return v
   if (v === 'true') return true
@@ -90,6 +126,33 @@ adminRouter.get('/media/library', async (_req, res) => {
     select: { id: true, title: true, posterUrl: true, videoUrl: true },
   })
   res.json({ files, catalog })
+})
+
+adminRouter.get('/media/raw', async (req: AuthedRequest, res) => {
+  const u = String(req.query.url ?? '').trim()
+  const abs = absUploadFromPublicUrl(u)
+  if (!abs) return res.status(400).json({ error: 'invalid url' })
+  if (!fs.existsSync(abs)) return res.status(404).json({ error: 'not found' })
+  const ext = path.extname(abs).toLowerCase()
+  res.setHeader('Content-Type', MEDIA_CONTENT_TYPE[ext] || 'application/octet-stream')
+  res.setHeader('Cache-Control', 'private, max-age=120')
+  res.sendFile(abs)
+})
+
+adminRouter.delete('/media/file', async (req: AuthedRequest, res) => {
+  const u = String(req.query.url ?? '').trim()
+  const abs = absUploadFromPublicUrl(u)
+  if (!abs) return res.status(400).json({ error: 'invalid url' })
+  const inUse = await uploadFileInUse(u)
+  if (inUse) {
+    return res.status(409).json({ error: `Файл используется (${inUse}). Сначала снимите ссылку в баннере/видео/продукте.` })
+  }
+  try {
+    fs.unlinkSync(abs)
+    res.status(204).end()
+  } catch {
+    res.status(500).json({ error: 'delete failed' })
+  }
 })
 
 adminRouter.get('/stats', async (_req, res) => {

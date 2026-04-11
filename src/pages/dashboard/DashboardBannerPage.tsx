@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import { apiFetch, apiUploadForm, assetUrl } from '@/shared/api/client'
+import { AdminMediaImage } from '@/shared/ui/AdminMediaImage'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 
@@ -119,12 +121,9 @@ export function DashboardBannerPage() {
     setModalExtraThumb(null)
   }
 
-  async function openPicker(mode: Exclude<PickerMode, null>) {
-    setPickerOpen(mode)
-    setLib(null)
-    setLibError(null)
+  const reloadLib = useCallback(async () => {
     setLibLoading(true)
-    if (mode === 'video') resetVideoModalUpload()
+    setLibError(null)
     try {
       const data = await apiFetch<MediaLibraryPayload>('/api/admin/media/library')
       setLib(data)
@@ -132,6 +131,39 @@ export function DashboardBannerPage() {
       setLibError(e instanceof Error ? e.message : 'Не удалось загрузить медиатеку')
     } finally {
       setLibLoading(false)
+    }
+  }, [])
+
+  async function openPicker(mode: Exclude<PickerMode, null>) {
+    setPickerOpen(mode)
+    setLib(null)
+    setLibError(null)
+    if (mode === 'video') resetVideoModalUpload()
+    await reloadLib()
+  }
+
+  async function deleteCatalogVideo(id: string, videoUrl: string) {
+    if (!window.confirm('Удалить ролик из каталога и файлы постера и видео с диска?')) return
+    setLibError(null)
+    try {
+      await apiFetch(`/api/admin/videos/${id}`, { method: 'DELETE' })
+      if (heroVideoLibraryUrl === videoUrl) setHeroVideoLibraryUrl(null)
+      await reloadLib()
+    } catch (e) {
+      setLibError(e instanceof Error ? e.message : 'Ошибка удаления')
+    }
+  }
+
+  async function deleteLooseFile(fileUrl: string) {
+    if (!window.confirm('Удалить этот файл с сервера?')) return
+    setLibError(null)
+    try {
+      await apiFetch(`/api/admin/media/file?url=${encodeURIComponent(fileUrl)}`, { method: 'DELETE' })
+      if (heroVideoLibraryUrl === fileUrl) setHeroVideoLibraryUrl(null)
+      if (b?.previewImageUrl === fileUrl) setB((prev) => (prev ? { ...prev, previewImageUrl: null } : prev))
+      await reloadLib()
+    } catch (e) {
+      setLibError(e instanceof Error ? e.message : 'Ошибка удаления')
     }
   }
 
@@ -289,9 +321,6 @@ export function DashboardBannerPage() {
   const posterFiles = lib?.files.filter((f) => f.kind === 'image') ?? []
   const videoFiles = lib?.files.filter((f) => f.kind === 'video') ?? []
 
-  const previewDisplaySrc =
-    pendingPreviewThumb || (b.previewImageUrl ? assetUrl(b.previewImageUrl) : '')
-
   return (
     <div className="p-6 lg:p-8">
       <h1 className="text-2xl font-semibold text-white">Баннер главной</h1>
@@ -375,8 +404,14 @@ export function DashboardBannerPage() {
               </button>
             </p>
           ) : null}
-          {previewDisplaySrc ? (
-            <img src={previewDisplaySrc} alt="" className="max-h-36 rounded-lg border border-white/10 object-cover" />
+          {pendingPreviewThumb ? (
+            <img src={pendingPreviewThumb} alt="" className="max-h-36 rounded-lg border border-white/10 object-cover" />
+          ) : b.previewImageUrl ? (
+            <AdminMediaImage
+              url={b.previewImageUrl}
+              alt=""
+              className="max-h-36 rounded-lg border border-white/10 object-cover"
+            />
           ) : null}
         </div>
 
@@ -467,8 +502,8 @@ export function DashboardBannerPage() {
             aria-label="Закрыть"
             onClick={() => setPickerOpen(null)}
           />
-          <div className="relative max-h-[88vh] w-full max-w-3xl overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <div className="relative flex max-h-[min(92vh,900px)] w-full max-w-[min(1400px,98vw)] flex-col overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
               <h2 className="text-sm font-semibold text-white">
                 {pickerOpen === 'poster' ? 'Выбор постера' : 'Видео для баннера'}
               </h2>
@@ -476,7 +511,7 @@ export function DashboardBannerPage() {
                 Закрыть
               </Button>
             </div>
-            <div className="max-h-[calc(88vh-52px)] overflow-y-auto p-4">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
               {libLoading ? <p className="text-sm text-zinc-500">Загрузка…</p> : null}
               {libError ? <p className="text-sm text-red-400">{libError}</p> : null}
 
@@ -497,39 +532,79 @@ export function DashboardBannerPage() {
                     />
                   </div>
                   <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Каталог видео (постеры)</p>
-                  <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                     {lib?.catalog.map((v) => (
-                      <button
+                      <div
                         key={v.id}
-                        type="button"
-                        className="overflow-hidden rounded-lg border border-white/10 bg-zinc-950 text-left transition hover:border-violet-500/50"
-                        onClick={() => {
-                          setB((prev) => (prev ? { ...prev, previewImageUrl: v.posterUrl } : prev))
-                          setPendingPreviewImage(null)
-                          setPickerOpen(null)
-                        }}
+                        className="group relative overflow-hidden rounded-lg border border-white/10 bg-zinc-950 text-left transition hover:border-violet-500/50"
                       >
-                        <img src={assetUrl(v.posterUrl)} alt="" className="aspect-video w-full object-cover" loading="lazy" />
-                        <span className="line-clamp-2 block p-2 text-xs text-zinc-300">{v.title}</span>
-                      </button>
+                        <button
+                          type="button"
+                          className="block w-full text-left"
+                          onClick={() => {
+                            setB((prev) => (prev ? { ...prev, previewImageUrl: v.posterUrl } : prev))
+                            setPendingPreviewImage(null)
+                            setPickerOpen(null)
+                          }}
+                        >
+                          <AdminMediaImage
+                            url={v.posterUrl}
+                            alt=""
+                            className="aspect-video w-full object-cover"
+                          />
+                          <span className="line-clamp-2 block p-2 text-xs text-zinc-300">{v.title}</span>
+                        </button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute right-2 top-2 size-8 p-0 opacity-90 shadow-lg"
+                          title="Удалить ролик из каталога"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            void deleteCatalogVideo(v.id, v.videoUrl)
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
                     ))}
                   </div>
                   <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Файлы (posters, banner, products)</p>
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
                     {posterFiles.map((f) => (
-                      <button
+                      <div
                         key={f.url}
-                        type="button"
-                        className="overflow-hidden rounded-lg border border-white/10 bg-zinc-950 text-left text-[10px] text-zinc-500 hover:border-violet-500/50"
-                        onClick={() => {
-                          setB((prev) => (prev ? { ...prev, previewImageUrl: f.url } : prev))
-                          setPendingPreviewImage(null)
-                          setPickerOpen(null)
-                        }}
+                        className="relative overflow-hidden rounded-lg border border-white/10 bg-zinc-950 text-[10px] text-zinc-500"
                       >
-                        <img src={assetUrl(f.url)} alt="" className="aspect-square w-full object-cover" loading="lazy" />
-                        <span className="block truncate p-1">{f.folder}</span>
-                      </button>
+                        <button
+                          type="button"
+                          className="block w-full text-left hover:border-violet-500/50"
+                          onClick={() => {
+                            setB((prev) => (prev ? { ...prev, previewImageUrl: f.url } : prev))
+                            setPendingPreviewImage(null)
+                            setPickerOpen(null)
+                          }}
+                        >
+                          <AdminMediaImage url={f.url} alt="" className="aspect-square w-full object-cover" />
+                          <span className="block truncate p-1">{f.folder}</span>
+                        </button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute right-1 top-1 size-7 p-0 opacity-90 shadow"
+                          title="Удалить файл с сервера"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            void deleteLooseFile(f.url)
+                          }}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
                     ))}
                   </div>
                 </>
@@ -611,59 +686,87 @@ export function DashboardBannerPage() {
                   </div>
 
                   <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Каталог видео</p>
-                  <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {lib?.catalog.map((v) => (
                       <div
                         key={v.id}
                         className="flex gap-3 rounded-lg border border-white/10 bg-zinc-950 p-2"
                       >
-                        <img
-                          src={assetUrl(v.posterUrl)}
+                        <AdminMediaImage
+                          url={v.posterUrl}
                           alt=""
-                          className="size-20 shrink-0 rounded object-cover"
-                          loading="lazy"
+                          className="size-24 shrink-0 rounded object-cover sm:size-28"
                         />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-zinc-200">{v.title}</p>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="secondary"
-                            className="mt-2"
-                            onClick={() => {
-                              setHeroVideoLibraryUrl(v.videoUrl)
-                              setB((prev) => (prev ? { ...prev, previewImageUrl: v.posterUrl } : prev))
-                              setPendingHeroVideo(null)
-                              setPendingPreviewImage(null)
-                              setClearVideo(false)
-                              setPickerOpen(null)
-                              resetVideoModalUpload()
-                            }}
-                          >
-                            Использовать ролик
-                          </Button>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setHeroVideoLibraryUrl(v.videoUrl)
+                                setB((prev) => (prev ? { ...prev, previewImageUrl: v.posterUrl } : prev))
+                                setPendingHeroVideo(null)
+                                setPendingPreviewImage(null)
+                                setClearVideo(false)
+                                setPickerOpen(null)
+                                resetVideoModalUpload()
+                              }}
+                            >
+                              Использовать ролик
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              className="gap-1"
+                              onClick={() => void deleteCatalogVideo(v.id, v.videoUrl)}
+                            >
+                              <Trash2 className="size-4" />
+                              Удалить
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
                   <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Файлы (videos, banner)</p>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                     {videoFiles.map((f) => (
-                      <button
+                      <div
                         key={f.url}
-                        type="button"
-                        className="rounded-lg border border-white/10 bg-zinc-950 p-3 text-left hover:border-violet-500/50"
-                        onClick={() => {
-                          setHeroVideoLibraryUrl(f.url)
-                          setPendingHeroVideo(null)
-                          setClearVideo(false)
-                          setPickerOpen(null)
-                          resetVideoModalUpload()
-                        }}
+                        className="relative rounded-lg border border-white/10 bg-zinc-950 p-3 text-left"
                       >
-                        <p className="text-xs text-violet-300">{f.folder}</p>
-                        <p className="mt-1 truncate text-[10px] text-zinc-500">{f.url}</p>
-                      </button>
+                        <button
+                          type="button"
+                          className="w-full text-left hover:opacity-90"
+                          onClick={() => {
+                            setHeroVideoLibraryUrl(f.url)
+                            setPendingHeroVideo(null)
+                            setClearVideo(false)
+                            setPickerOpen(null)
+                            resetVideoModalUpload()
+                          }}
+                        >
+                          <p className="text-xs text-violet-300">{f.folder}</p>
+                          <p className="mt-1 truncate text-[10px] text-zinc-500">{f.url}</p>
+                        </button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute right-2 top-2 size-8 p-0 shadow"
+                          title="Удалить файл с сервера"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            void deleteLooseFile(f.url)
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
                     ))}
                   </div>
                 </>

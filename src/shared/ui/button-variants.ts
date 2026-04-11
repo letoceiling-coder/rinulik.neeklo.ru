@@ -11,6 +11,8 @@ export const buttonVariants = cva(
           'border border-white/15 bg-white/5 text-zinc-100 hover:bg-white/10',
         ghost: 'text-zinc-300 hover:bg-white/10 hover:text-white',
         link: 'text-violet-400 underline-offset-4 hover:underline',
+        destructive:
+          'border border-red-500/40 bg-red-950/80 text-red-100 hover:bg-red-900/80 hover:border-red-400/50',
       },
       size: {
         default: 'h-10 px-4 py-2',
