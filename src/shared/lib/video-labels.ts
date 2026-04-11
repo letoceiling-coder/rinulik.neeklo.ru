@@ -1,6 +1,4 @@
-import type { VideoCategory } from '@/entities/video'
-
-const LABELS: Record<VideoCategory, string> = {
+const LABELS: Record<string, string> = {
   ad: 'Реклама',
   business: 'Бизнес',
   entertainment: 'Развлечения',
@@ -8,6 +6,6 @@ const LABELS: Record<VideoCategory, string> = {
   products: 'Товары',
 }
 
-export function videoCategoryLabel(category: VideoCategory): string {
-  return LABELS[category]
+export function videoCategoryLabel(category: string): string {
+  return LABELS[category.toLowerCase()] ?? category
 }

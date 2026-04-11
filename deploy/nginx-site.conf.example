@@ -1,0 +1,34 @@
+# Скопируйте в /etc/nginx/sites-available/ и подставьте server_name + ssl пути.
+# Прокси на тот же порт, что в ecosystem.config.cjs (по умолчанию 4010).
+
+upstream generate_ai_video_backend {
+    server 127.0.0.1:4010;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name YOUR_DOMAIN.ru www.YOUR_DOMAIN.ru;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name YOUR_DOMAIN.ru www.YOUR_DOMAIN.ru;
+
+    ssl_certificate     /etc/letsencrypt/live/YOUR_DOMAIN.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/YOUR_DOMAIN.ru/privkey.pem;
+
+    client_max_body_size 120m;
+
+    location / {
+        proxy_pass http://generate_ai_video_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+}

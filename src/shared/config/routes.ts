@@ -1,12 +1,17 @@
 export const ROUTES = {
   home: '/',
   videos: '/videos',
+  login: '/login',
   dashboard: {
     root: '/dashboard',
     videos: '/dashboard/videos',
-    chats: '/dashboard/chats',
+    services: '/dashboard/services',
+    tariffs: '/dashboard/tariffs',
+    advantages: '/dashboard/advantages',
+    banner: '/dashboard/banner',
+    products: '/dashboard/products',
+    chatDemo: '/dashboard/chat-demo',
     leads: '/dashboard/leads',
-    assistants: '/dashboard/assistants',
     settings: '/dashboard/settings',
   },
 } as const

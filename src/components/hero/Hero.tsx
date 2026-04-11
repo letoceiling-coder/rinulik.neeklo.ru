@@ -1,10 +1,15 @@
 import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion'
 import { useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { ROUTES } from '@/shared/config/routes'
+import type { PublicBanner } from '@/shared/api/types'
+import { assetUrl } from '@/shared/api/client'
 import { Button } from '@/shared/ui/button'
 
-export function Hero() {
+export interface HeroProps {
+  banner: PublicBanner
+}
+
+export function Hero({ banner }: HeroProps) {
   const ref = useRef<HTMLElement>(null)
   const reduceMotion = useReducedMotion()
   const { scrollYProgress } = useScroll({
@@ -12,6 +17,26 @@ export function Hero() {
     offset: ['start start', 'end start'],
   })
   const y = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 80])
+
+  function ctaLink(href: string, label: string, variant: 'default' | 'secondary') {
+    const useAnchor =
+      href.startsWith('http://') ||
+      href.startsWith('https://') ||
+      href.startsWith('#')
+    const inner = useAnchor ? (
+      <a href={href}>{label}</a>
+    ) : (
+      <Link to={href}>{label}</Link>
+    )
+    if (variant === 'secondary') {
+      return (
+        <Button size="lg" variant="secondary" asChild>
+          {inner}
+        </Button>
+      )
+    }
+    return <Button size="lg" asChild>{inner}</Button>
+  }
 
   return (
     <section
@@ -29,19 +54,14 @@ export function Hero() {
           transition={{ duration: reduceMotion ? 0 : 0.5, ease: [0.22, 1, 0.36, 1] }}
         >
           <h1 className="text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl lg:text-5xl">
-            Создаём видео, которые продают за вас
+            {banner.headline}
           </h1>
           <p className="mt-4 max-w-xl text-pretty text-base text-zinc-400 sm:text-lg">
-            AI генерация рекламных роликов, контента и видео для бизнеса за
-            минуты
+            {banner.subheadline}
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button size="lg" asChild>
-              <Link to={ROUTES.videos}>Создать видео</Link>
-            </Button>
-            <Button size="lg" variant="secondary" asChild>
-              <a href="#demo-videos">Смотреть демо</a>
-            </Button>
+            {ctaLink(banner.ctaPrimaryHref, banner.ctaPrimaryLabel, 'default')}
+            {ctaLink(banner.ctaSecondaryHref, banner.ctaSecondaryLabel, 'secondary')}
           </div>
         </motion.div>
 
@@ -54,14 +74,22 @@ export function Hero() {
             transition={{ type: 'spring', stiffness: 400, damping: 25 }}
             className="group relative aspect-video overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-violet-950/80 via-zinc-900 to-indigo-950/90 shadow-2xl shadow-violet-950/40 ring-1 ring-white/5"
           >
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cdefs%3E%3Cpattern%20id%3D%22g%22%20width%3D%2260%22%20height%3D%2260%22%20patternUnits%3D%22userSpaceOnUse%22%3E%3Cpath%20d%3D%22M60%200H0v60%22%20fill%3D%22none%22%20stroke%3D%22rgba(255%2C255%2C255%2C0.04)%22%2F%3E%3C%2Fpattern%3E%3C%2Fdefs%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22url(%23g)%22%2F%3E%3C%2Fsvg%3E')] opacity-60" />
+            {banner.previewImageUrl ? (
+              <img
+                src={assetUrl(banner.previewImageUrl)}
+                alt=""
+                className="absolute inset-0 size-full object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cdefs%3E%3Cpattern%20id%3D%22g%22%20width%3D%2260%22%20height%3D%2260%22%20patternUnits%3D%22userSpaceOnUse%22%3E%3Cpath%20d%3D%22M60%200H0v60%22%20fill%3D%22none%22%20stroke%3D%22rgba(255%2C255%2C255%2C0.04)%22%2F%3E%3C%2Fpattern%3E%3C%2Fdefs%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22url(%23g)%22%2F%3E%3C%2Fsvg%3E')] opacity-60" />
+            )}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="flex size-16 items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-sm transition-all group-hover:bg-violet-500/30 group-hover:shadow-violet-500/40">
                 <span className="ml-1 text-2xl">▶</span>
               </div>
             </div>
             <p className="absolute bottom-4 left-4 right-4 text-center text-xs text-zinc-500">
-              Превью ролика (mock) · hover — glow
+              Превью баннера · настройка в админ-панели
             </p>
           </motion.div>
         </motion.div>

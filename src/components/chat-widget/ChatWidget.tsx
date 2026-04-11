@@ -1,17 +1,15 @@
 import { motion } from 'framer-motion'
 import { useState } from 'react'
+import type { PublicChatLine } from '@/shared/api/types'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
 import { Input } from '@/shared/ui/input'
 
-const MOCK = [
-  { id: '1', from: 'user' as const, text: 'Нужен ролик для маркетплейса за 1 минуту' },
-  { id: '2', from: 'bot' as const, text: 'Соберу структуру, визуал и озвучку. Какой товар и УТП?' },
-  { id: '3', from: 'user' as const, text: 'Наушники, акцент на шумодав' },
-  { id: '4', from: 'bot' as const, text: 'Готово: 3 варианта сценария. Запускаю генерацию превью…' },
-]
+export interface ChatWidgetProps {
+  lines: PublicChatLine[]
+}
 
-export function ChatWidget() {
+export function ChatWidget({ lines }: ChatWidgetProps) {
   const [draft, setDraft] = useState('')
 
   return (
@@ -29,7 +27,7 @@ export function ChatWidget() {
       </CardHeader>
       <CardContent className="space-y-3 bg-[#0e1621] p-0">
         <div className="flex max-h-[280px] flex-col gap-2 overflow-y-auto p-3">
-          {MOCK.map((m, i) => (
+          {lines.map((m, i) => (
             <motion.div
               key={m.id}
               initial={{ opacity: 0, y: 8 }}
@@ -55,14 +53,15 @@ export function ChatWidget() {
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Сообщение..."
             className="border-white/10 bg-[#182533]"
+            readOnly
           />
           <Button type="button" size="icon" variant="secondary" className="shrink-0">
             ➤
           </Button>
         </div>
         <div className="px-3 pb-3">
-          <Button className="w-full" variant="secondary" type="button">
-            Попробовать
+          <Button className="w-full" variant="secondary" type="button" asChild>
+            <a href="#cta">Попробовать</a>
           </Button>
         </div>
       </CardContent>

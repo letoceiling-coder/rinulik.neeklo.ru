@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import { useCallback, useRef, useState } from 'react'
 import type { Video } from '@/entities/video'
+import { assetUrl } from '@/shared/api/client'
 import { videoCategoryLabel } from '@/shared/lib/video-labels'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
@@ -42,13 +43,13 @@ export function VideoCard({ video, onUse, className }: VideoCardProps) {
       >
         <div className="relative aspect-video bg-zinc-950">
           <img
-            src={video.posterSrc}
+            src={assetUrl(video.posterSrc)}
             alt=""
             className={`absolute inset-0 size-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-0' : 'opacity-100'}`}
           />
           <video
             ref={ref}
-            src={video.previewSrc}
+            src={assetUrl(video.previewSrc)}
             className="size-full object-cover"
             muted
             loop

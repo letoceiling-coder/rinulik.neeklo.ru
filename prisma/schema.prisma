@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum VideoCategory {
+  AD
+  BUSINESS
+  ENTERTAINMENT
+  GIFTS
+  PRODUCTS
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  LOST
+}
+
+enum ChatSide {
+  USER
+  BOT
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+}
+
+model Video {
+  id          String        @id @default(cuid())
+  title       String
+  category    VideoCategory
+  posterUrl   String
+  videoUrl    String
+  published   Boolean       @default(true)
+  sortOrder   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Service {
+  id          String  @id @default(cuid())
+  title       String
+  description String
+  iconKey     String
+  sortOrder   Int     @default(0)
+  published   Boolean @default(true)
+}
+
+model Tariff {
+  id          String  @id @default(cuid())
+  name        String
+  price       String
+  description String
+  features    String // JSON array of strings
+  highlighted Boolean @default(false)
+  sortOrder   Int     @default(0)
+  published   Boolean @default(true)
+}
+
+model Advantage {
+  id          String  @id @default(cuid())
+  title       String
+  description String
+  iconKey     String
+  sortOrder   Int     @default(0)
+  published   Boolean @default(true)
+}
+
+model HeroBanner {
+  id                 Int     @id @default(1)
+  headline           String
+  subheadline        String
+  ctaPrimaryLabel    String
+  ctaPrimaryHref     String
+  ctaSecondaryLabel  String
+  ctaSecondaryHref   String
+  previewImageUrl    String?
+  ctaBoxTitle        String  @default("Начать бесплатно")
+  ctaBoxSubtitle     String  @default("Оставьте контакт — пришлём доступ в песочницу")
+  updatedAt          DateTime @updatedAt
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  title       String
+  description String
+  imageUrl    String?
+  sortOrder   Int     @default(0)
+  published   Boolean @default(true)
+}
+
+model ChatDemoLine {
+  id        String   @id @default(cuid())
+  sortOrder Int
+  side      ChatSide
+  text      String
+}
+
+model Lead {
+  id        String     @id @default(cuid())
+  name      String
+  phone     String
+  source    String     @default("landing")
+  status    LeadStatus @default(NEW)
+  createdAt DateTime   @default(now())
+}

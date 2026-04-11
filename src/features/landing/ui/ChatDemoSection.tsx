@@ -1,6 +1,11 @@
+import type { PublicChatLine } from '@/shared/api/types'
 import { ChatWidget } from '@/components/chat-widget/ChatWidget'
 
-export function ChatDemoSection() {
+export interface ChatDemoSectionProps {
+  lines: PublicChatLine[]
+}
+
+export function ChatDemoSection({ lines }: ChatDemoSectionProps) {
   return (
     <section className="border-y border-white/10 bg-[#0a0e14] px-4 py-20 sm:px-6">
       <div className="mx-auto flex max-w-6xl flex-col gap-10 lg:flex-row lg:items-center lg:justify-between">
@@ -13,7 +18,7 @@ export function ChatDemoSection() {
             действия для лида.
           </p>
         </div>
-        <ChatWidget />
+        <ChatWidget lines={lines} />
       </div>
     </section>
   )

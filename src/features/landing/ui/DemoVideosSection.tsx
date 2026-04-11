@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMemo, useState } from 'react'
 import { VideoCard } from '@/components/video-card/VideoCard'
-import type { VideoCategory } from '@/entities/video'
-import { MOCK_VIDEOS } from '@/shared/mocks/videos'
+import type { Video, VideoCategory } from '@/entities/video'
+import type { PublicVideo } from '@/shared/api/types'
 import { videoCategoryLabel } from '@/shared/lib/video-labels'
 
 const FILTERS: { id: VideoCategory | 'all'; label: string }[] = [
@@ -14,16 +14,27 @@ const FILTERS: { id: VideoCategory | 'all'; label: string }[] = [
   { id: 'products', label: 'Товары' },
 ]
 
-export function DemoVideosSection() {
+function toVideo(v: PublicVideo): Video {
+  return {
+    id: v.id,
+    title: v.title,
+    category: v.category as VideoCategory,
+    posterSrc: v.posterSrc,
+    previewSrc: v.previewSrc,
+  }
+}
+
+export interface DemoVideosSectionProps {
+  videos: PublicVideo[]
+}
+
+export function DemoVideosSection({ videos }: DemoVideosSectionProps) {
   const [filter, setFilter] = useState<VideoCategory | 'all'>('all')
 
-  const list = useMemo(
-    () =>
-      filter === 'all'
-        ? MOCK_VIDEOS
-        : MOCK_VIDEOS.filter((v) => v.category === filter),
-    [filter],
-  )
+  const list = useMemo(() => {
+    if (filter === 'all') return videos
+    return videos.filter((v) => v.category === filter)
+  }, [filter, videos])
 
   return (
     <section id="demo-videos" className="scroll-mt-20 px-4 py-20 sm:px-6">
@@ -62,7 +73,7 @@ export function DemoVideosSection() {
                 transition={{ duration: 0.2 }}
               >
                 <VideoCard
-                  video={video}
+                  video={toVideo(video)}
                   onUse={() =>
                     window.alert(
                       `Демо: «${video.title}» (${videoCategoryLabel(video.category)})`,

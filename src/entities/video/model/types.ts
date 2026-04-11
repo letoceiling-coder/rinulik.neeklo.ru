@@ -1,3 +1,4 @@
+/** Категории совпадают с ответом публичного API (lowercase). */
 export type VideoCategory =
   | 'ad'
   | 'business'
@@ -9,9 +10,7 @@ export interface Video {
   id: string
   title: string
   category: VideoCategory
-  /** Poster or thumbnail */
   posterSrc: string
-  /** Short preview clip (e.g. mp4) */
   previewSrc: string
   durationSec?: number
 }

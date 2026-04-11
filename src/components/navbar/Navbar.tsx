@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
+import { useAuthStore } from '@/app/store/useAuthStore'
 import { ROUTES } from '@/shared/config/routes'
 import { cn } from '@/shared/lib/cn'
 import { Button } from '@/shared/ui/button'
@@ -22,6 +23,9 @@ export function Navbar() {
   const [open, setOpen] = useState(false)
   const reduce = useReducedMotion()
   const { pathname } = useLocation()
+  const user = useAuthStore((s) => s.user)
+  const logout = useAuthStore((s) => s.logout)
+  const isAdmin = user?.role === 'ADMIN'
 
   useEffect(() => {
     setOpen(false)
@@ -41,7 +45,7 @@ export function Navbar() {
       <div className="relative mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link
           to={ROUTES.home}
-          className="text-sm font-semibold tracking-tight text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 rounded-md"
+          className="rounded-md text-sm font-semibold tracking-tight text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
         >
           Generate<span className="text-violet-400">AI</span>
         </Link>
@@ -52,17 +56,27 @@ export function Navbar() {
           <NavLink to={ROUTES.videos} className={navLinkClass}>
             Видео
           </NavLink>
-          <NavLink to={ROUTES.dashboard.root} className={navLinkClass}>
-            Дашборд
-          </NavLink>
+          {isAdmin ? (
+            <NavLink to={ROUTES.dashboard.root} className={navLinkClass}>
+              Дашборд
+            </NavLink>
+          ) : null}
         </nav>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" className="hidden md:inline-flex" asChild>
-            <Link to={ROUTES.dashboard.root}>Войти</Link>
-          </Button>
-          <Button size="sm" className="hidden sm:inline-flex md:hidden" asChild>
-            <Link to={ROUTES.dashboard.root}>Кабинет</Link>
-          </Button>
+          {isAdmin ? (
+            <>
+              <Button variant="secondary" size="sm" className="hidden md:inline-flex" asChild>
+                <Link to={ROUTES.dashboard.root}>Панель</Link>
+              </Button>
+              <Button variant="ghost" size="sm" className="hidden sm:inline-flex" type="button" onClick={() => logout()}>
+                Выйти
+              </Button>
+            </>
+          ) : (
+            <Button variant="secondary" size="sm" className="hidden md:inline-flex" asChild>
+              <Link to={ROUTES.login}>Вход</Link>
+            </Button>
+          )}
           <Button
             type="button"
             variant="ghost"
@@ -93,13 +107,21 @@ export function Navbar() {
                 <NavLink to={ROUTES.videos} className={mobileLinkClass}>
                   Видео
                 </NavLink>
-                <NavLink to={ROUTES.dashboard.root} className={mobileLinkClass}>
-                  Дашборд
-                </NavLink>
+                {isAdmin ? (
+                  <NavLink to={ROUTES.dashboard.root} className={mobileLinkClass}>
+                    Дашборд
+                  </NavLink>
+                ) : (
+                  <NavLink to={ROUTES.login} className={mobileLinkClass}>
+                    Вход
+                  </NavLink>
+                )}
               </nav>
-              <Button className="mt-4 w-full" asChild>
-                <Link to={ROUTES.dashboard.root}>Войти в кабинет</Link>
-              </Button>
+              {isAdmin ? (
+                <Button className="mt-4 w-full" variant="secondary" type="button" onClick={() => logout()}>
+                  Выйти
+                </Button>
+              ) : null}
             </motion.div>
           ) : null}
         </AnimatePresence>
