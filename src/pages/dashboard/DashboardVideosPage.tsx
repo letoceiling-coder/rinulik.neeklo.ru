@@ -161,6 +161,22 @@ export function DashboardVideosPage() {
     }
   }
 
+  async function replacePoster(id: string, file: File) {
+    setError(null)
+    setBusy(true)
+    try {
+      const fd = new FormData()
+      fd.append('poster', file, file.name)
+      const updated = await apiUploadForm<AdminVideo>(`/api/admin/videos/${id}`, fd, 'PATCH')
+      await load()
+      setPreview((p) => (p && p.id === id ? updated : p))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось заменить постер')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function remove(id: string) {
     if (!window.confirm('Удалить видео и файлы с диска?')) return
     setError(null)
@@ -271,7 +287,9 @@ export function DashboardVideosPage() {
         </Button>
       </form>
       <h2 className="mt-10 text-lg font-medium text-zinc-200">Каталог</h2>
-      <p className="mt-1 text-xs text-zinc-500">Постеры через API (если nginx не отдаёт /uploads). «Просмотр» — крупное окно с видео.</p>
+      <p className="mt-1 text-xs text-zinc-500">
+        Если «нет превью» — файла нет на диске (часто после переноса БД). Загрузите постер снова полем ниже. «Просмотр» — крупное окно с видео.
+      </p>
       <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {videos.map((v) => (
           <li
@@ -299,6 +317,22 @@ export function DashboardVideosPage() {
                   Удалить
                 </Button>
               </div>
+              <label className="mt-2 block text-xs text-zinc-500">
+                Заменить постер
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={busy}
+                  className="mt-1 block w-full text-sm"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (!f) return
+                    void replacePoster(v.id, f).finally(() => {
+                      e.target.value = ''
+                    })
+                  }}
+                />
+              </label>
             </div>
           </li>
         ))}
@@ -336,13 +370,31 @@ export function DashboardVideosPage() {
                 />
               </div>
             </div>
-            <div className="flex shrink-0 flex-wrap gap-2 border-t border-white/10 p-4">
-              <Button type="button" variant="destructive" onClick={() => void remove(preview.id)}>
-                Удалить с диска
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setPreview(null)}>
-                Закрыть
-              </Button>
+            <div className="flex shrink-0 flex-col gap-3 border-t border-white/10 p-4">
+              <label className="block text-xs text-zinc-500">
+                Заменить постер (без удаления ролика)
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={busy}
+                  className="mt-1 block max-w-sm text-sm"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (!f) return
+                    void replacePoster(preview.id, f).finally(() => {
+                      e.target.value = ''
+                    })
+                  }}
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="destructive" onClick={() => void remove(preview.id)}>
+                  Удалить с диска
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => setPreview(null)}>
+                  Закрыть
+                </Button>
+              </div>
             </div>
           </div>
         </div>

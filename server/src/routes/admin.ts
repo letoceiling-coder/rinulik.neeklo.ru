@@ -205,32 +205,54 @@ adminRouter.post(
   },
 )
 
-adminRouter.patch('/videos/:id', async (req, res) => {
-  const { id } = req.params
-  const { title, category, published, sortOrder } = req.body as Record<
-    string,
-    unknown
-  >
-  const data: {
-    title?: string
-    published?: boolean
-    sortOrder?: number
-    category?: VideoCategory
-  } = {}
-  if (typeof title === 'string') data.title = title
-  if (typeof published === 'boolean') data.published = published
-  if (typeof sortOrder === 'number') data.sortOrder = sortOrder
-  if (typeof category === 'string') {
-    const upper = category.toUpperCase() as keyof typeof VideoCategory
-    if (VideoCategory[upper]) data.category = VideoCategory[upper]
-  }
-  try {
-    const v = await prisma.video.update({ where: { id }, data })
-    res.json(v)
-  } catch {
-    res.status(404).json({ error: 'not found' })
-  }
-})
+adminRouter.patch(
+  '/videos/:id',
+  upload.single('poster'),
+  async (req: AuthedRequest, res) => {
+    const id = typeof req.params.id === 'string' ? req.params.id : req.params.id?.[0]
+    if (!id) return res.status(400).json({ error: 'invalid id' })
+    const { title, category, published, sortOrder } = req.body as Record<string, unknown>
+    const data: {
+      title?: string
+      published?: boolean
+      sortOrder?: number
+      category?: VideoCategory
+      posterUrl?: string
+    } = {}
+    if (typeof title === 'string') data.title = title
+    if (typeof published === 'boolean') data.published = published
+    if (typeof sortOrder === 'number') data.sortOrder = sortOrder
+    else if (sortOrder !== undefined && sortOrder !== null && sortOrder !== '')
+      data.sortOrder = Number(sortOrder) || 0
+    if (typeof category === 'string') {
+      const upper = category.toUpperCase() as keyof typeof VideoCategory
+      if (VideoCategory[upper]) data.category = VideoCategory[upper]
+    }
+    if (req.file) {
+      const prev = await prisma.video.findUnique({ where: { id }, select: { posterUrl: true } })
+      if (prev?.posterUrl?.startsWith('/uploads/')) {
+        const rel = prev.posterUrl.replace('/uploads/', '')
+        try {
+          fs.unlinkSync(path.join(uploadRoot, rel))
+        } catch {
+          /* ignore */
+        }
+      }
+      data.posterUrl = publicFileUrl(path.relative(uploadRoot, req.file.path))
+    }
+    if (Object.keys(data).length === 0) {
+      const v = await prisma.video.findUnique({ where: { id } })
+      if (!v) return res.status(404).json({ error: 'not found' })
+      return res.json(v)
+    }
+    try {
+      const v = await prisma.video.update({ where: { id }, data })
+      res.json(v)
+    } catch {
+      res.status(404).json({ error: 'not found' })
+    }
+  },
+)
 
 adminRouter.delete('/videos/:id', async (req, res) => {
   const { id } = req.params

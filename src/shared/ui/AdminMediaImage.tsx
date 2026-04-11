@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { assetUrl } from '@/shared/api/client'
 import { useAuthStore } from '@/app/store/useAuthStore'
 
 function apiOrigin(): string {
@@ -9,7 +10,8 @@ function apiOrigin(): string {
 }
 
 /**
- * Превью файлов из `/uploads/...` в админке: запрос с Bearer, обход 404 nginx без proxy на /uploads.
+ * Админ-превью: внешние и blob — как есть. `/uploads/…` — сначала публичный URL (nginx → Node),
+ * при ошибке — один запрос к `/api/admin/media/raw` с Bearer.
  */
 export function AdminMediaImage({
   url,
@@ -22,8 +24,15 @@ export function AdminMediaImage({
 }) {
   const [src, setSrc] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
+  const blobRef = useRef<string | null>(null)
+  const triedRawRef = useRef(false)
 
   useEffect(() => {
+    triedRawRef.current = false
+    if (blobRef.current) {
+      URL.revokeObjectURL(blobRef.current)
+      blobRef.current = null
+    }
     if (!url) {
       setSrc(null)
       setFailed(true)
@@ -39,44 +48,67 @@ export function AdminMediaImage({
       setFailed(false)
       return
     }
-
-    let alive = true
-    let blobUrl: string | null = null
     setFailed(false)
-    setSrc(null)
+    setSrc(assetUrl(url))
+  }, [url])
 
+  useEffect(
+    () => () => {
+      if (blobRef.current) {
+        URL.revokeObjectURL(blobRef.current)
+        blobRef.current = null
+      }
+    },
+    [],
+  )
+
+  const loadRawBlob = useCallback(() => {
     const raw = `${apiOrigin()}/api/admin/media/raw?${new URLSearchParams({ url })}`
     const token = useAuthStore.getState().token
-    fetch(raw, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-      .then((r) => {
-        if (!r.ok) throw new Error(String(r.status))
-        return r.blob()
-      })
-      .then((blob) => {
-        if (!alive) return
-        blobUrl = URL.createObjectURL(blob)
-        setSrc(blobUrl)
-      })
-      .catch(() => {
-        if (alive) setFailed(true)
-      })
-
-    return () => {
-      alive = false
-      if (blobUrl) URL.revokeObjectURL(blobUrl)
-    }
+    return fetch(raw, { headers: token ? { Authorization: `Bearer ${token}` } : {} }).then((r) => {
+      if (!r.ok) throw new Error(String(r.status))
+      return r.blob()
+    })
   }, [url])
+
+  const onImgError = useCallback(() => {
+    if (!url.startsWith('/uploads/')) {
+      setFailed(true)
+      return
+    }
+    if (triedRawRef.current) {
+      setFailed(true)
+      return
+    }
+    triedRawRef.current = true
+    void loadRawBlob()
+      .then((blob) => {
+        if (blobRef.current) URL.revokeObjectURL(blobRef.current)
+        const u = URL.createObjectURL(blob)
+        blobRef.current = u
+        setSrc(u)
+      })
+      .catch(() => setFailed(true))
+  }, [url, loadRawBlob])
 
   if (failed || !src) {
     return (
       <div
         className={`flex items-center justify-center bg-zinc-800 text-xs text-zinc-500 ${className ?? ''}`}
-        title="Нет файла или нет доступа"
+        title="Нет файла на сервере — в «Видео» замените постер или перезалейте ролик"
       >
         нет превью
       </div>
     )
   }
 
-  return <img src={src} alt={alt} className={className} loading="lazy" />
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onError={onImgError}
+    />
+  )
 }
