@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { Menu, X } from 'lucide-react'
+import { Menu, Sparkles, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/app/store/useAuthStore'
@@ -26,6 +26,7 @@ export function Navbar() {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const isAdmin = user?.role === 'ADMIN'
+  const isUser = user?.role === 'USER'
 
   useEffect(() => {
     setOpen(false)
@@ -56,6 +57,11 @@ export function Navbar() {
           <NavLink to={ROUTES.videos} className={navLinkClass}>
             Видео
           </NavLink>
+          {user ? (
+            <NavLink to={ROUTES.studio} className={navLinkClass}>
+              Студия
+            </NavLink>
+          ) : null}
           {isAdmin ? (
             <NavLink to={ROUTES.dashboard.root} className={navLinkClass}>
               Дашборд
@@ -63,19 +69,39 @@ export function Navbar() {
           ) : null}
         </nav>
         <div className="flex items-center gap-2">
-          {isAdmin ? (
+          {user ? (
             <>
-              <Button variant="secondary" size="sm" className="hidden md:inline-flex" asChild>
-                <Link to={ROUTES.dashboard.root}>Панель</Link>
-              </Button>
-              <Button variant="ghost" size="sm" className="hidden sm:inline-flex" type="button" onClick={() => logout()}>
+              {isUser ? (
+                <Button variant="default" size="sm" className="hidden md:inline-flex" asChild>
+                  <Link to={ROUTES.studio}>
+                    <Sparkles className="size-3.5" /> Студия
+                  </Link>
+                </Button>
+              ) : null}
+              {isAdmin ? (
+                <Button variant="secondary" size="sm" className="hidden md:inline-flex" asChild>
+                  <Link to={ROUTES.dashboard.root}>Панель</Link>
+                </Button>
+              ) : null}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hidden sm:inline-flex"
+                type="button"
+                onClick={() => logout()}
+              >
                 Выйти
               </Button>
             </>
           ) : (
-            <Button variant="secondary" size="sm" className="hidden md:inline-flex" asChild>
-              <Link to={ROUTES.login}>Вход</Link>
-            </Button>
+            <>
+              <Button variant="ghost" size="sm" className="hidden md:inline-flex" asChild>
+                <Link to={ROUTES.login}>Вход</Link>
+              </Button>
+              <Button variant="default" size="sm" className="hidden md:inline-flex" asChild>
+                <Link to={ROUTES.register}>Регистрация</Link>
+              </Button>
+            </>
           )}
           <Button
             type="button"
@@ -107,17 +133,28 @@ export function Navbar() {
                 <NavLink to={ROUTES.videos} className={mobileLinkClass}>
                   Видео
                 </NavLink>
+                {user ? (
+                  <NavLink to={ROUTES.studio} className={mobileLinkClass}>
+                    Студия
+                  </NavLink>
+                ) : null}
                 {isAdmin ? (
                   <NavLink to={ROUTES.dashboard.root} className={mobileLinkClass}>
                     Дашборд
                   </NavLink>
-                ) : (
-                  <NavLink to={ROUTES.login} className={mobileLinkClass}>
-                    Вход
-                  </NavLink>
-                )}
+                ) : null}
+                {!user ? (
+                  <>
+                    <NavLink to={ROUTES.login} className={mobileLinkClass}>
+                      Вход
+                    </NavLink>
+                    <NavLink to={ROUTES.register} className={mobileLinkClass}>
+                      Регистрация
+                    </NavLink>
+                  </>
+                ) : null}
               </nav>
-              {isAdmin ? (
+              {user ? (
                 <Button className="mt-4 w-full" variant="secondary" type="button" onClick={() => logout()}>
                   Выйти
                 </Button>

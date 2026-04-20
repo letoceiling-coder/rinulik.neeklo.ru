@@ -68,8 +68,17 @@ bash deploy/pull-and-deploy.sh
 - `JWT_SECRET` — длинная случайная строка
 - `FRONTEND_ORIGIN=https://rinulik.neeklo.ru`
 - `PORT=4010`
+- `FREEPIK_API_KEY` — ключ из кабинета Freepik (**только на сервере**, никогда не в git и не во фронте)
 
 Для SPA с тем же доменом **`VITE_API_URL` оставьте пустым** (запросы на `/api` с того же origin).
+
+### Freepik Studio
+
+Пользователи регистрируются на `/register` (роль `USER`), попадают в `/studio` и генерируют фото/видео. Ключ читается только сервером из `FREEPIK_API_KEY`. Маршруты прокси: `POST /api/studio/generate`, `GET /api/studio/jobs/:id` (автоматический опрос Freepik до `COMPLETED`/`FAILED`), `GET /api/studio/models`, `POST /api/studio/upload` (референсы → `/uploads/user/<userId>/`).
+
+Учёт лимитов: у каждого пользователя дневная квота `dailyCredits` (по умолчанию 50, сбрасывается через 24 ч). Стоимости моделей в кредитах живут в `server/src/lib/modelCatalog.ts`. Дневной RPD Freepik отображается в UI (`dailyFreeRPD`) — это предел на весь ключ, настраивайте пользовательские квоты исходя из него.
+
+Nginx уже проксирует `/api/` и `/uploads/` на Node, отдельные правила не нужны.
 
 ## Nginx и TLS для этого домена
 

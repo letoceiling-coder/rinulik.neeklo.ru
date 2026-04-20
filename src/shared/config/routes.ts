@@ -2,6 +2,8 @@ export const ROUTES = {
   home: '/',
   videos: '/videos',
   login: '/login',
+  register: '/register',
+  studio: '/studio',
   dashboard: {
     root: '/dashboard',
     videos: '/dashboard/videos',

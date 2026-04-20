@@ -5,6 +5,7 @@ import cors from 'cors'
 import { publicRouter } from './routes/public.js'
 import { authRouter } from './routes/auth.js'
 import { adminRouter } from './routes/admin.js'
+import { studioRouter } from './routes/studio.js'
 
 const app = express()
 const uploadRoot = path.resolve(process.cwd(), 'uploads')
@@ -15,12 +16,13 @@ app.use(
     credentials: true,
   }),
 )
-app.use(express.json())
+app.use(express.json({ limit: '15mb' }))
 app.use('/uploads', express.static(uploadRoot))
 
 app.use('/api/public', publicRouter)
 app.use('/api/auth', authRouter)
 app.use('/api/admin', adminRouter)
+app.use('/api/studio', studioRouter)
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true })

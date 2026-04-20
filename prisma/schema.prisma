@@ -32,12 +32,69 @@ enum ChatSide {
   BOT
 }
 
+enum GenerationKind {
+  IMAGE
+  VIDEO
+}
+
+enum GenerationStatus {
+  QUEUED
+  CREATED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  role         Role     @default(USER)
-  createdAt    DateTime @default(now())
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  role          Role     @default(USER)
+  firstName     String?
+  lastName      String?
+  /** Аккумулятивный остаток кредитов (можно пополнять админом). */
+  credits       Int      @default(0)
+  /** Дневной лимит, сбрасывается каждые сутки. */
+  dailyCredits  Int      @default(50)
+  dailyUsed     Int      @default(0)
+  dailyResetAt  DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  jobs          GenerationJob[]
+  usage         UsageLog[]
+}
+
+model GenerationJob {
+  id             String           @id @default(cuid())
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind           GenerationKind
+  modelId        String           // id модели из каталога (mystic, flux-dev, kling-v2-5-pro, seedance-pro-1080p)
+  status         GenerationStatus @default(QUEUED)
+  freepikTaskId  String?
+  prompt         String
+  params         String           // JSON с исходными параметрами
+  resultUrls     String?          // JSON массив URL после COMPLETED
+  creditsCost    Int              @default(0)
+  errorMessage   String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([freepikTaskId])
+}
+
+model UsageLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId      String?
+  action     String   // generate_image, generate_video, upload_reference, ...
+  modelId    String?
+  cost       Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model Video {

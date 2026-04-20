@@ -20,7 +20,63 @@ authRouter.post('/login', async (req, res) => {
   const token = signToken(user.id, user.role)
   res.json({
     token,
-    user: { id: user.id, email: user.email, role: user.role },
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      firstName: user.firstName,
+      lastName: user.lastName,
+    },
+  })
+})
+
+authRouter.post('/register', async (req, res) => {
+  const {
+    email,
+    password,
+    firstName,
+    lastName,
+  } = req.body as {
+    email?: string
+    password?: string
+    firstName?: string
+    lastName?: string
+  }
+  const normalizedEmail = email?.trim().toLowerCase()
+  if (!normalizedEmail || !password) {
+    return res.status(400).json({ error: 'email and password required' })
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Пароль должен быть минимум 6 символов' })
+  }
+  const exists = await prisma.user.findUnique({ where: { email: normalizedEmail } })
+  if (exists) {
+    return res.status(409).json({ error: 'Пользователь с таким email уже существует' })
+  }
+  const passwordHash = await bcrypt.hash(password, 10)
+  const user = await prisma.user.create({
+    data: {
+      email: normalizedEmail,
+      passwordHash,
+      role: 'USER',
+      firstName: firstName?.trim() || null,
+      lastName: lastName?.trim() || null,
+      dailyCredits: 50,
+      dailyUsed: 0,
+      credits: 0,
+      dailyResetAt: new Date(),
+    },
+  })
+  const token = signToken(user.id, user.role)
+  res.status(201).json({
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      firstName: user.firstName,
+      lastName: user.lastName,
+    },
   })
 })
 
@@ -34,7 +90,7 @@ authRouter.get('/me', async (req: AuthedRequest, res) => {
     const { sub } = verifyToken(token)
     const user = await prisma.user.findUnique({
       where: { id: sub },
-      select: { id: true, email: true, role: true },
+      select: { id: true, email: true, role: true, firstName: true, lastName: true },
     })
     if (!user) return res.status(401).json({ error: 'Unauthorized' })
     res.json({ user })

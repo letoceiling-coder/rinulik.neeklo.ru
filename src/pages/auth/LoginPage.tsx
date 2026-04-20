@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { apiFetch } from '@/shared/api/client'
 import type { AuthUser } from '@/shared/api/types'
@@ -10,14 +11,16 @@ import { Input } from '@/shared/ui/input'
 export function LoginPage() {
   const { user, setAuth } = useAuthStore()
   const location = useLocation()
-  const from = (location.state as { from?: string } | null)?.from ?? ROUTES.dashboard.root
+  const fallback =
+    (location.state as { from?: string } | null)?.from ?? null
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  if (user?.role === 'ADMIN') {
-    return <Navigate to={from} replace />
+  if (user) {
+    const to = fallback ?? (user.role === 'ADMIN' ? ROUTES.dashboard.root : ROUTES.studio)
+    return <Navigate to={to} replace />
   }
 
   async function onSubmit(e: FormEvent) {
@@ -30,8 +33,11 @@ export function LoginPage() {
         json: { email: email.trim().toLowerCase(), password },
       })
       setAuth(res.token, res.user)
+      toast.success('Вход выполнен')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка входа')
+      const msg = err instanceof Error ? err.message : 'Ошибка входа'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -39,11 +45,10 @@ export function LoginPage() {
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-zinc-950 px-4">
-      <div className="w-full max-w-sm rounded-xl border border-white/10 bg-zinc-900/60 p-8">
-        <h1 className="text-center text-xl font-semibold text-white">Вход администратора</h1>
+      <div className="w-full max-w-sm rounded-xl border border-white/10 bg-zinc-900/60 p-8 shadow-2xl">
+        <h1 className="text-center text-xl font-semibold text-white">Вход</h1>
         <p className="mt-2 text-center text-xs text-zinc-500">
-          Доступ к панели только для роли{' '}
-          <span className="text-violet-400">ADMIN</span>
+          Админы попадают в панель, пользователи — в Студию генерации
         </p>
         <form className="mt-6 space-y-4" onSubmit={onSubmit}>
           <div>
@@ -79,8 +84,14 @@ export function LoginPage() {
             {loading ? 'Вход…' : 'Войти'}
           </Button>
         </form>
-        <p className="mt-6 text-center text-xs text-zinc-600">
-          <Link to={ROUTES.home} className="text-violet-400 hover:underline">
+        <p className="mt-6 text-center text-xs text-zinc-500">
+          Нет аккаунта?{' '}
+          <Link to={ROUTES.register} className="text-violet-400 hover:underline">
+            Зарегистрироваться
+          </Link>
+        </p>
+        <p className="mt-2 text-center text-xs text-zinc-600">
+          <Link to={ROUTES.home} className="text-zinc-500 hover:underline">
             На главную
           </Link>
         </p>
