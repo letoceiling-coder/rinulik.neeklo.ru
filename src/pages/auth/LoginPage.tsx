@@ -27,7 +27,7 @@ export function LoginPage() {
     try {
       const res = await apiFetch<{ token: string; user: AuthUser }>('/api/auth/login', {
         method: 'POST',
-        json: { email, password },
+        json: { email: email.trim().toLowerCase(), password },
       })
       setAuth(res.token, res.user)
     } catch (err) {

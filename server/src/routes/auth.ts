@@ -9,10 +9,11 @@ export const authRouter = Router()
 
 authRouter.post('/login', async (req, res) => {
   const { email, password } = req.body as { email?: string; password?: string }
-  if (!email || !password) {
+  const normalizedEmail = email?.trim().toLowerCase()
+  if (!normalizedEmail || !password) {
     return res.status(400).json({ error: 'email and password required' })
   }
-  const user = await prisma.user.findUnique({ where: { email: email.trim() } })
+  const user = await prisma.user.findUnique({ where: { email: normalizedEmail } })
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     return res.status(401).json({ error: 'Invalid credentials' })
   }
