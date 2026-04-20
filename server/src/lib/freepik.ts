@@ -1,6 +1,9 @@
 /**
  * Клиент Freepik API. Ключ читается строго из FREEPIK_API_KEY (серверный .env).
  * Никогда не проксируется на фронт и не попадает в ответы API.
+ *
+ * Работает универсально: путь эндпоинта конкретной модели описывается
+ * в modelCatalog.ts (поле `endpoint`, напр. "text-to-image/flux-dev" или "mystic").
  */
 
 const DEFAULT_BASE = 'https://api.freepik.com'
@@ -41,8 +44,8 @@ async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown):
   if (!res.ok) {
     let message = `Freepik ${res.status}`
     try {
-      const j = JSON.parse(text) as { message?: string; detail?: string }
-      message = j.message || j.detail || message
+      const j = JSON.parse(text) as { message?: string; detail?: string; error?: string }
+      message = j.message || j.detail || j.error || message
     } catch {
       message = text.slice(0, 400) || message
     }
@@ -52,84 +55,15 @@ async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown):
   return JSON.parse(text) as T
 }
 
-// --- Mystic (text -> image) ---
-
-export interface MysticCreatePayload {
-  prompt: string
-  resolution?: '1k' | '2k' | '4k'
-  aspect_ratio?: string
-  model?: 'realism' | 'fluid' | 'zen' | 'flexible' | 'super_real' | 'editorial_portraits'
-  structure_reference?: string // base64
-  style_reference?: string // base64
-  structure_strength?: number
-  adherence?: number
-  hdr?: number
-  webhook_url?: string
+function normEndpoint(ep: string): string {
+  const clean = ep.replace(/^\/+|\/+$/g, '')
+  return clean.startsWith('v1/') ? `/${clean}` : `/v1/ai/${clean}`
 }
 
-export function mysticCreate(p: MysticCreatePayload) {
-  return request<FreepikEnvelope<FreepikTask>>('POST', '/v1/ai/mystic', p)
-}
-export function mysticGet(taskId: string) {
-  return request<FreepikEnvelope<FreepikTask>>('GET', `/v1/ai/mystic/${taskId}`)
+export function freepikCreate(endpoint: string, body: unknown) {
+  return request<FreepikEnvelope<FreepikTask>>('POST', normEndpoint(endpoint), body)
 }
 
-// --- Flux Dev (text -> image) ---
-
-export interface FluxDevPayload {
-  prompt: string
-  aspect_ratio?: string
-  seed?: number
-  styling?: Record<string, unknown>
-  webhook_url?: string
-}
-
-export function fluxDevCreate(p: FluxDevPayload) {
-  return request<FreepikEnvelope<FreepikTask>>('POST', '/v1/ai/text-to-image/flux-dev', p)
-}
-export function fluxDevGet(taskId: string) {
-  return request<FreepikEnvelope<FreepikTask>>('GET', `/v1/ai/text-to-image/flux-dev/${taskId}`)
-}
-
-// --- Kling 2.5 Pro (image -> video) ---
-
-export interface KlingV25Payload {
-  image: string // URL или base64
-  prompt?: string
-  negative_prompt?: string
-  duration: '5' | '10'
-  cfg_scale?: number
-  webhook_url?: string
-}
-
-export function klingV25Create(p: KlingV25Payload) {
-  return request<FreepikEnvelope<FreepikTask>>('POST', '/v1/ai/image-to-video/kling-v2-5-pro', p)
-}
-export function klingV25Get(taskId: string) {
-  return request<FreepikEnvelope<FreepikTask>>(
-    'GET',
-    `/v1/ai/image-to-video/kling-v2-5-pro/${taskId}`,
-  )
-}
-
-// --- Seedance Pro 1080p (image -> video) ---
-
-export interface SeedancePayload {
-  image?: string
-  prompt: string
-  duration?: '5' | '10'
-  camera_fixed?: boolean
-  aspect_ratio?: string
-  seed?: number
-  webhook_url?: string
-}
-
-export function seedanceCreate(p: SeedancePayload) {
-  return request<FreepikEnvelope<FreepikTask>>('POST', '/v1/ai/image-to-video/seedance-pro-1080p', p)
-}
-export function seedanceGet(taskId: string) {
-  return request<FreepikEnvelope<FreepikTask>>(
-    'GET',
-    `/v1/ai/image-to-video/seedance-pro-1080p/${taskId}`,
-  )
+export function freepikGet(endpoint: string, taskId: string) {
+  return request<FreepikEnvelope<FreepikTask>>('GET', `${normEndpoint(endpoint)}/${taskId}`)
 }

@@ -11,14 +11,8 @@ import {
   type ModelDef,
 } from '../lib/modelCatalog.js'
 import {
-  fluxDevCreate,
-  fluxDevGet,
-  klingV25Create,
-  klingV25Get,
-  mysticCreate,
-  mysticGet,
-  seedanceCreate,
-  seedanceGet,
+  freepikCreate,
+  freepikGet,
   type FreepikEnvelope,
   type FreepikTask,
 } from '../lib/freepik.js'
@@ -79,39 +73,28 @@ function parseResult(task: FreepikTask | undefined): string[] | null {
   return task.generated
 }
 
+function sanitizeParams(model: ModelDef, params: Record<string, unknown>): Record<string, unknown> {
+  const allow = model.allowedParams ?? model.params.map((p) => p.name)
+  const out: Record<string, unknown> = {}
+  for (const key of allow) {
+    const v = params[key]
+    if (v === undefined || v === null) continue
+    if (typeof v === 'string' && v.trim() === '') continue
+    out[key] = v
+  }
+  return out
+}
+
 async function callCreate(model: ModelDef, params: Record<string, unknown>) {
-  if (model.id === 'mystic') {
-    const r = await mysticCreate(params as never)
-    return r.data
-  }
-  if (model.id === 'flux-dev') {
-    const r = await fluxDevCreate(params as never)
-    return r.data
-  }
-  if (model.id === 'kling-v2-5-pro') {
-    const r = await klingV25Create(params as never)
-    return r.data
-  }
-  if (model.id === 'seedance-pro-1080p') {
-    const r = await seedanceCreate(params as never)
-    return r.data
-  }
-  throw new Error(`Unknown model ${model.id}`)
+  const body = sanitizeParams(model, params)
+  const r = await freepikCreate(model.endpoint, body)
+  return r.data
 }
 
 async function callGet(modelId: string, taskId: string): Promise<FreepikEnvelope<FreepikTask>> {
-  switch (modelId) {
-    case 'mystic':
-      return mysticGet(taskId)
-    case 'flux-dev':
-      return fluxDevGet(taskId)
-    case 'kling-v2-5-pro':
-      return klingV25Get(taskId)
-    case 'seedance-pro-1080p':
-      return seedanceGet(taskId)
-    default:
-      throw new Error('unknown model')
-  }
+  const model = findModel(modelId)
+  if (!model) throw new Error('unknown model')
+  return freepikGet(model.endpoint, taskId)
 }
 
 function mapStatus(s: FreepikTask['status']): 'CREATED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' {

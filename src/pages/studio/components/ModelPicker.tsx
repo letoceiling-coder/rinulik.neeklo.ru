@@ -10,7 +10,7 @@ interface Props {
 
 export function ModelPicker({ models, value, onChange }: Props) {
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <div className="grid max-h-[420px] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
       {models.map((m) => (
         <button
           key={m.id}
